@@ -4,11 +4,21 @@ import torch
 from torch.utils.data import Dataset
 import cv2
 
-def sample_gaussian(x, m):
+def sample_gaussian(x, m, mu=None, cov=None):
+    if mu is None:
+        mu, cov = get_mu_sigma(x)
+    return sample_mv(m, mu, cov)
+
+
+def get_mu_sigma(x):
     x = x.data.numpy()
     mu = x.mean(0).squeeze()
-    cov2 = np.cov(x, rowvar=False)
-    z = np.random.multivariate_normal(mu, cov2, size=m)
+    cov = np.cov(x, rowvar=False)
+    return mu, cov
+
+
+def sample_mv(m, mu, cov):
+    z = np.random.multivariate_normal(mu, cov, size=m)
     z_t = torch.from_numpy(z).float()
     radius = z_t.norm(2, 1).unsqueeze(1).expand_as(z_t)
     z_t = z_t / radius
@@ -33,6 +43,7 @@ class DiskDataset(Dataset):
     def __getitem__(self, idx):
         img = cv2.imread(self.image_paths[idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
         img = cv2.resize(img, (64, 64)) / 255.0
         img = img.transpose((2, 0, 1))
 

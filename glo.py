@@ -38,10 +38,9 @@ class GLO():
         # self.dist = nn.DataParallel(self.dist)
         # self.dist = torch.nn.MSELoss().to(self.device)
 
-    def train(self, dataset, opt_params, vis_epochs=1, outptus_dir='runs'):
+    def train(self, dataloader, opt_params, vis_epochs=1, outptus_dir='runs', start_epoch=0):
         os.makedirs(outptus_dir, exist_ok=True)
-        dataloader = utils.get_dataloader(dataset, opt_params.batch_size, self.device)
-        for epoch in range(opt_params.num_epochs):
+        for epoch in range(start_epoch, opt_params.num_epochs):
             er = self.train_epoch(dataloader, epoch, opt_params)
             print("NAG Epoch: %d Error: %f" % (epoch, er))
             torch.save(self.netZ.state_dict(), f"{outptus_dir}/netZ_nag.pth")
@@ -106,3 +105,6 @@ class GLO():
         Irec = self.netG(self.netZ(idx))
         vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=False)
 
+    def load_weights(self, ckp_dir, device):
+        self.netZ.load_state_dict(torch.load(os.path.join(ckp_dir, 'netZ_nag.pth'), map_location=device))
+        self.netG.load_state_dict(torch.load(os.path.join(ckp_dir, 'netG_nag.pth'), map_location=device))
