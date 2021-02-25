@@ -1,0 +1,108 @@
+import numpy as np
+import torch
+import torch.nn.parallel
+import torch.optim as optim
+import torch.utils.data
+import torch.nn.functional as F 
+import torchvision.utils as vutils
+from tqdm import tqdm
+from time import time
+import model
+import utils
+import os
+
+from perceptual_loss.vgg_loss import VGGFeatures
+
+
+class GLO():
+    def __init__(self, glo_params, dataset_size, device):
+        self.dataset_size = dataset_size
+        self.device = device
+        self.netZ = model._netZ(glo_params.z_dim, dataset_size)
+        self.netZ.apply(model.weights_init)
+        self.netZ.to(self.device)
+
+        self.netG = model._netG(glo_params.z_dim, glo_params.img_dim, glo_params.channels, glo_params.use_bn)
+        self.netG.apply(model.weights_init)
+        self.netG.to(self.device)
+        # self.netG = nn.DataParallel(self.netG)
+
+        self.num_debug_imgs = 64
+        self.fixed_noise = torch.FloatTensor(self.num_debug_imgs, glo_params.z_dim).normal_(0, 1).to(self.device)
+
+        self.duplicate_channels = glo_params.channels == 1
+        self.pad_imgs = glo_params.img_dim == 28
+
+        # lap_criterion = pyr.MS_Lap(4, 5).cuda()
+        self.dist = VGGFeatures(3 if glo_params.img_dim == 28 else 4).to(device)
+        # self.dist = nn.DataParallel(self.dist)
+        # self.dist = torch.nn.MSELoss().to(self.device)
+
+    def train(self, dataset, opt_params, vis_epochs=1, outptus_dir='runs'):
+        os.makedirs(outptus_dir, exist_ok=True)
+        dataloader = utils.get_dataloader(dataset, opt_params.batch_size, self.device)
+        for epoch in range(opt_params.num_epochs):
+            er = self.train_epoch(dataloader, epoch, opt_params)
+            print("NAG Epoch: %d Error: %f" % (epoch, er))
+            torch.save(self.netZ.state_dict(), f"{outptus_dir}/netZ_nag.pth")
+            torch.save(self.netG.state_dict(), f"{outptus_dir}/netG_nag.pth")
+            if epoch % vis_epochs == 0:
+                self.visualize(epoch, dataloader.dataset, outptus_dir)
+
+    def train_epoch(self, dataloader, epoch, opt_params):
+        # Compute learning rate
+        decay_steps = epoch // opt_params.decay_epochs
+        lr = opt_params.lr * opt_params.decay_rate ** decay_steps
+        # Initialize optimizers
+        optimizerG = optim.Adam(self.netG.parameters(), lr=lr * opt_params.generator_lr_factor, betas=(0.5, 0.999))
+        optimizerZ = optim.Adam(self.netZ.parameters(), lr=lr, betas=(0.5, 0.999))
+        # Start optimizing
+        er = 0
+        pbar = tqdm(enumerate(dataloader))
+        start = time()
+        for i, (indices, images) in pbar:
+            # Put numpy data into tensors
+            indices = indices.long().to(self.device)
+            images = images.float().to(self.device)
+            # Forward pass
+            self.netZ.zero_grad()
+            self.netG.zero_grad()
+            zi = self.netZ(indices)
+            Ii = self.netG(zi)
+
+            rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
+            rec_loss = rec_loss.mean()
+            # Backward pass and optimization step
+            rec_loss.backward()
+            optimizerG.step()
+            optimizerZ.step()
+            er += rec_loss.item()
+            pbar.set_description(f"im/sec: {i * opt_params.batch_size / (time() - start):.2f}")
+        self.netZ.get_norm()
+        er = er / (i + 1)
+        return er
+
+    def visualize(self, epoch, dataset, outptus_dir):
+        debug_indices = np.arange(self.num_debug_imgs)
+        if epoch == 0:
+            os.makedirs(os.path.join(outptus_dir, "imgs", "generate_fixed"), exist_ok=True)
+            os.makedirs(os.path.join(outptus_dir, "imgs", "generate_sampled"), exist_ok=True)
+            os.makedirs(os.path.join(outptus_dir, "imgs", "reconstructions"), exist_ok=True)
+            # dumpy original images fro later reconstruction debug images
+            first_imgs = torch.from_numpy(np.array([dataset[x][1] for x in debug_indices]))
+            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'),
+                              normalize=False)
+        # fixed latent Generated images
+        Igen = self.netG(self.fixed_noise)
+        vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=False)
+
+        # Generated from sampled latent vectors
+        z = utils.sample_gaussian(self.netZ.emb.weight.clone().cpu(), self.num_debug_imgs).to(self.device)
+        Igauss = self.netG(z)
+        vutils.save_image(Igauss.data, os.path.join(outptus_dir, 'imgs', 'generate_sampled',f"epoch_{epoch}.png"), normalize=False)
+
+        # Reconstructed images
+        idx = torch.from_numpy(debug_indices).to(self.device)
+        Irec = self.netG(self.netZ(idx))
+        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=False)
+
