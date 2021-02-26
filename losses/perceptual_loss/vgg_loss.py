@@ -22,7 +22,7 @@ class VGGFeatures(nn.Module):
                 features += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
         self.features = nn.Sequential(*features)
-        self.load_state_dict(torch.load("perceptual_loss/vgg16_head.pth"))
+        self.load_state_dict(torch.load("losses/perceptual_loss/vgg16_head.pth"))
 
     def get_activations(self, z, level):
         layer_ids = self.layer_ids[:level]

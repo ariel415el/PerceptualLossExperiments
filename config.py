@@ -9,7 +9,7 @@ mnist_configs.channels = 1
 mnist_configs.z_dim = 64
 mnist_configs.use_bn = True
 
-mnist_configs.lr = 0.01
+mnist_configs.lr = 0.1
 mnist_configs.generator_lr_factor = 0.1
 mnist_configs.batch_size = 128
 mnist_configs.decay_epochs = 20

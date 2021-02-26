@@ -3,15 +3,15 @@ import torch
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
-import torch.nn.functional as F 
 import torchvision.utils as vutils
 from tqdm import tqdm
 from time import time
 import model
 import utils
 import os
-
-from perceptual_loss.vgg_loss import VGGFeatures
+import matplotlib.pyplot as plt
+from losses.lap1_loss import LapLoss
+from losses.perceptual_loss.vgg_loss import VGGFeatures
 
 
 class GLO():
@@ -35,18 +35,25 @@ class GLO():
 
         # lap_criterion = pyr.MS_Lap(4, 5).cuda()
         self.dist = VGGFeatures(3 if glo_params.img_dim == 28 else 4).to(device)
+        # self.dist = LapLoss(max_levels=3).to(device)
         # self.dist = nn.DataParallel(self.dist)
         # self.dist = torch.nn.MSELoss().to(self.device)
 
     def train(self, dataloader, opt_params, vis_epochs=1, outptus_dir='runs', start_epoch=0):
         os.makedirs(outptus_dir, exist_ok=True)
+        errs = []
         for epoch in range(start_epoch, opt_params.num_epochs):
             er = self.train_epoch(dataloader, epoch, opt_params)
+            errs.append(er)
             print("NAG Epoch: %d Error: %f" % (epoch, er))
             torch.save(self.netZ.state_dict(), f"{outptus_dir}/netZ_nag.pth")
             torch.save(self.netG.state_dict(), f"{outptus_dir}/netG_nag.pth")
             if epoch % vis_epochs == 0:
                 self.visualize(epoch, dataloader.dataset, outptus_dir)
+                plt.plot(np.arange(len(errs)), errs)
+                plt.xlabel("Epoch")
+                plt.ylabel("loss")
+                plt.savefig(os.path.join(outptus_dir, "train_loss.png"))
 
     def train_epoch(self, dataloader, epoch, opt_params):
         # Compute learning rate
