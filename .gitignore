@@ -2,3 +2,4 @@
 *.idea*
 *__pycache*
 *pyc*
+/losses/perceptual_loss/vgg16-397923af.pth

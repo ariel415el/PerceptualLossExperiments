@@ -23,9 +23,9 @@ class GLO():
         self.netZ.to(self.device)
 
         self.netG = model._netG(glo_params.z_dim, glo_params.img_dim, glo_params.channels, glo_params.use_bn)
+        # self.netG = model.DCGANGenerator(glo_params.z_dim, glo_params.channels)
         self.netG.apply(model.weights_init)
         self.netG.to(self.device)
-        # self.netG = nn.DataParallel(self.netG)
 
         self.num_debug_imgs = 64
         self.fixed_noise = torch.FloatTensor(self.num_debug_imgs, glo_params.z_dim).normal_(0, 1).to(self.device)
@@ -33,9 +33,8 @@ class GLO():
         self.duplicate_channels = glo_params.channels == 1
         self.pad_imgs = glo_params.img_dim == 28
 
-        # lap_criterion = pyr.MS_Lap(4, 5).cuda()
-        self.dist = VGGFeatures(3 if glo_params.img_dim == 28 else 4).to(device)
-        # self.dist = LapLoss(max_levels=3).to(device)
+        # self.dist = VGGFeatures(3 if glo_params.img_dim == 28 else 4).to(device)
+        self.dist = LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device)
         # self.dist = nn.DataParallel(self.dist)
         # self.dist = torch.nn.MSELoss().to(self.device)
 

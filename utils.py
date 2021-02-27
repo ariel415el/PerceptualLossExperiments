@@ -26,16 +26,17 @@ def sample_mv(m, mu, cov):
 
 
 def get_dataloader(dataset, batch_size, device):
-    kwargs = {'batch_size': batch_size, 'shuffle': True}
+    kwargs = {'batch_size': batch_size, 'shuffle': True, 'drop_last': True}
     if device == "cuda:0":
-        kwargs.update({'num_workers': 12,
+        kwargs.update({'num_workers': 0,
                        'pin_memory': True})
     return torch.utils.data.DataLoader(dataset, **kwargs)
 
 
 class DiskDataset(Dataset):
-    def __init__(self, imgs_dir):
-        self.image_paths = [os.path.join(imgs_dir, x) for x in os.listdir(imgs_dir)]
+    def __init__(self, paths, crop=False):
+        self.image_paths = paths
+        self.crop = crop
 
     def __len__(self):
         return len(self.image_paths)
@@ -43,11 +44,35 @@ class DiskDataset(Dataset):
     def __getitem__(self, idx):
         img = cv2.imread(self.image_paths[idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
+        if self.crop:
+            img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
         img = cv2.resize(img, (64, 64)) / 255.0
         img = img.transpose((2, 0, 1))
 
         return idx, img
+
+
+class MemoryDataset(Dataset):
+    def __init__(self, paths, crop=False):
+        self.images = []
+        self.crop = crop
+        print("Loading data into memory")
+        for path in paths:
+            img = cv2.imread(path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            if self.crop:
+                img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
+            img = cv2.resize(img, (64, 64)) / 255.0
+            img = img.transpose((2, 0, 1))
+            self.images.append(img)
+
+        self.images = np.array(self.images)
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        return idx, self.images[idx]
 
 
 class MnistDataset(Dataset):

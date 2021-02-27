@@ -162,6 +162,13 @@ class InceptionV3(nn.Module):
 
         return outp
 
+    def get_activations(self, input, device):
+        if input.size(1) == 1:
+            input = input.expand((input.size(0), 3, input.size(2), input.size(3)))
+        input = input.to(device).float()
+        act = self.forward(input)[0].squeeze().cpu().numpy()
+
+        return act
 
 def fid_inception_v3():
     """Build pretrained Inception model for FID computation

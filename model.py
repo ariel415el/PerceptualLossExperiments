@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 import numpy as np
 import torch.nn as nn
 import torch.nn.init as init
-
+import torch.nn.functional as F
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -73,4 +69,31 @@ class _netG(nn.Module):
         zn = z.norm(2, 1).detach().unsqueeze(1).expand_as(z)
         z = z.div(zn)
         output = self.main(z)
+        return output
+
+
+class DCGANGenerator(nn.Module):
+    def __init__(self, latent_dim, channels):
+        ngf = 32
+        super(DCGANGenerator, self).__init__()
+        self.network = nn.Sequential(
+            nn.ConvTranspose2d(latent_dim, ngf * 4, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        input = input.view(input.size(0), input.size(1), 1, 1)
+        output = self.network(input)
         return output
