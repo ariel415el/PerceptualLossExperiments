@@ -1,5 +1,7 @@
-/training_dir
+/GLO/training_dir
 *.idea*
 *__pycache*
 *pyc*
-/losses/perceptual_loss/vgg16-397923af.pth
+/losses/vgg_loss/vgg16-397923af.pth
+/kmeans/output_dir
+/perceptual_mean_optimization/outputs

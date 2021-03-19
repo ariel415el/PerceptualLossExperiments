@@ -13,6 +13,7 @@ import os
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
 def get_dataloaders(dataset_name):
     if dataset_name == "mnist":
         train_dataset = utils.MnistDataset("../data/Mnist/train_Mnist.npy")
@@ -23,10 +24,10 @@ def get_dataloaders(dataset_name):
 
     elif dataset_name in ['celeba', 'ffhq']:
         if dataset_name == 'celeba':
-            train_samples_path = "../data/img_align_celeba"
+            train_samples_path = "../../../data/img_align_celeba"
             dataset_type = utils.DiskDataset
         else:
-            train_samples_path = "../data/FFHQ/thumbnails128x128"
+            train_samples_path = "../../../data/FFHQ/thumbnails128x128"
             dataset_type = utils.MemoryDataset
 
         img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
@@ -47,11 +48,12 @@ def get_dataloaders(dataset_name):
 def main():
     dataset_name = 'ffhq'
     train_dataloader, test_dataloader, conf = get_dataloaders(dataset_name)
-    train_dir = f"training_dir/{dataset_name}-lap1-loss"
+    train_dir = f"training_dir/{dataset_name}-vgg5-dcgan"
+    # train_dir = f"training_dir/{dataset_name}-mmd-tests_2"
 
     glo = GLO(conf, dataset_size=len(train_dataloader.dataset), device=device)
-    glo.train(train_dataloader, conf, outptus_dir=train_dir)
-    # glo.load_weights(train_dir, device)
+    # glo.train(train_dataloader, conf, outptus_dir=train_dir)
+    glo.load_weights(train_dir, device)
 
     imle = IMLE(conf.e_dim, conf.z_dim)
     # imle.load_weights(train_dir, device)

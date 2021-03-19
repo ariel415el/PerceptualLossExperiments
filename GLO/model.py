@@ -73,25 +73,47 @@ class _netG(nn.Module):
 
 
 class DCGANGenerator(nn.Module):
-    def __init__(self, latent_dim, channels):
-        ngf = 32
+    def __init__(self, latent_dim, channels, output_dim=28):
+        ngf = 64
         super(DCGANGenerator, self).__init__()
-        self.network = nn.Sequential(
-            nn.ConvTranspose2d(latent_dim, ngf * 4, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
+        if output_dim == 28:
+            self.network = nn.Sequential(
+                nn.ConvTranspose2d(latent_dim, ngf * 4, 4, 1, 0, bias=False),
+                nn.BatchNorm2d(ngf * 4),
+                nn.ReLU(True),
 
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
+                nn.ConvTranspose2d(ngf * 4, ngf * 2, 3, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf * 2),
+                nn.ReLU(True),
 
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
+                nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf),
+                nn.ReLU(True),
 
-            nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
-            nn.Tanh()
-        )
+                nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
+                nn.Tanh()
+            )
+        elif output_dim == 64:
+            self.network = nn.Sequential(
+                nn.ConvTranspose2d(latent_dim, ngf * 8, 4, 1, 0, bias=False),
+                nn.BatchNorm2d(ngf * 8),
+                nn.ReLU(True),
+
+                nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf * 4),
+                nn.ReLU(True),
+
+                nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf * 2),
+                nn.ReLU(True),
+
+                nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf),
+                nn.ReLU(True),
+
+                nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
+                nn.Tanh()
+            )
 
     def forward(self, input):
         input = input.view(input.size(0), input.size(1), 1, 1)

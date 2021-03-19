@@ -10,8 +10,8 @@ import model
 import utils
 import os
 import matplotlib.pyplot as plt
-from losses.lap1_loss import LapLoss
-from losses.perceptual_loss.vgg_loss import VGGFeatures
+
+from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
 class GLO():
@@ -22,8 +22,8 @@ class GLO():
         self.netZ.apply(model.weights_init)
         self.netZ.to(self.device)
 
-        self.netG = model._netG(glo_params.z_dim, glo_params.img_dim, glo_params.channels, glo_params.use_bn)
-        # self.netG = model.DCGANGenerator(glo_params.z_dim, glo_params.channels)
+        # self.netG = model._netG(glo_params.z_dim, glo_params.img_dim, glo_params.channels, glo_params.use_bn)
+        self.netG = model.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
         self.netG.apply(model.weights_init)
         self.netG.to(self.device)
 
@@ -33,10 +33,15 @@ class GLO():
         self.duplicate_channels = glo_params.channels == 1
         self.pad_imgs = glo_params.img_dim == 28
 
-        # self.dist = VGGFeatures(3 if glo_params.img_dim == 28 else 4).to(device)
-        self.dist = LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device)
-        # self.dist = nn.DataParallel(self.dist)
-        # self.dist = torch.nn.MSELoss().to(self.device)
+
+        self.dists = [
+                         VGGFeatures(3 if glo_params.img_dim == 28 else 5).to(device),
+                        # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
+                        # torch.nn.MSELoss().to(self.device),
+                        # PatchRBFLoss(3, device=self.device).to(self.device),
+                        # MMDApproximate(r=200, pool_size=32, pool_strides=16, normalize_patch='channel_mean').to(self.device),
+                        # self.dist = ScnnLoss().to(self.device)
+        ]
 
     def train(self, dataloader, opt_params, vis_epochs=1, outptus_dir='runs', start_epoch=0):
         os.makedirs(outptus_dir, exist_ok=True)
@@ -75,7 +80,8 @@ class GLO():
             zi = self.netZ(indices)
             Ii = self.netG(zi)
 
-            rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
+            # rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
+            rec_loss = sum([dist(Ii, images) for dist in self.dists])
             rec_loss = rec_loss.mean()
             # Backward pass and optimization step
             rec_loss.backward()

@@ -28,7 +28,7 @@ def sample_mv(m, mu, cov):
 def get_dataloader(dataset, batch_size, device):
     kwargs = {'batch_size': batch_size, 'shuffle': True, 'drop_last': True}
     if device == "cuda:0":
-        kwargs.update({'num_workers': 0,
+        kwargs.update({'num_workers': 12,
                        'pin_memory': True})
     return torch.utils.data.DataLoader(dataset, **kwargs)
 

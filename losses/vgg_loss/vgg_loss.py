@@ -1,7 +1,8 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torchvision.transforms import transforms
 
 cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
 
@@ -9,9 +10,10 @@ cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 
 class VGGFeatures(nn.Module):
     def __init__(self, level):
         super(VGGFeatures, self).__init__()
+        self.layer_ids = [2, 7, 12, 21, 30][:level]
         self.level = level
-        self.layer_ids = [2, 7, 12, 21, 30]
 
+        self.normalize_input = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         features = []
         in_channels = 3
         for v in cfg:
@@ -22,15 +24,26 @@ class VGGFeatures(nn.Module):
                 features += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
         self.features = nn.Sequential(*features)
-        self.load_state_dict(torch.load("losses/perceptual_loss/vgg16_head.pth"))
 
-    def get_activations(self, z, level):
-        layer_ids = self.layer_ids[:level]
-        id_max = layer_ids[-1] + 1
+        # i = 0
+        # for feat in self.features:
+        #     if type(feat) == torch.nn.Conv2d:
+        #         torch.nn.init.kaiming_normal_(feat.weight)
+        #         if i == 0:
+        #             i += 1
+        #             feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
+        #         torch.nn.init.constant_(feat.bias, 0.)
+
+        self.load_state_dict(torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16_head.pth")))
+        # self.load_state_dict(torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16-faceGender_features.pth")))
+
+    def get_activations(self, z):
+        z = self.normalize_input(z)
+        id_max = self.layer_ids[-1] + 1
         activations = []
         for i in range(id_max):
             z = self.features[i](z)
-            if i in layer_ids:
+            if i in self.layer_ids:
                 activations.append(z)
         return activations
 
@@ -43,8 +56,8 @@ class VGGFeatures(nn.Module):
           I1 = F.pad(I1, (2, 2, 2, 2))
           I2 = F.pad(I2, (2, 2, 2, 2))
 
-        f1 = self.get_activations(I1, self.level)
-        f2 = self.get_activations(I2, self.level)
+        f1 = self.get_activations(I1)
+        f2 = self.get_activations(I2)
 
         loss = torch.abs(I1 - I2).view(batch_size, -1).mean(1) # L2 loss
         for i in range(self.level):
@@ -52,6 +65,7 @@ class VGGFeatures(nn.Module):
             loss = loss + layer_loss
 
         return loss
+
 if __name__ == '__main__':
     model = VGGFeatures(3)
     model(torch.zeros((8,3,64,64)), torch.ones((8,3,64,64)))
