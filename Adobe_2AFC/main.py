@@ -2,19 +2,17 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
-import sys
-sys.path.append('/home/ariel/universirty/PerceptualLoss/PerceptualLossGLO-Pytorch/losses')
 from dataset import get_dataloader
 
-from ScnnLoss_ariel import SCNNNetwork
-from lap1_loss import LapLoss
-# from mmd_exact_loss import MMDExact
-from mmd_loss import MMDApproximate
-from patch_loss import PatchRBFLoss, PatchRBFLaplacianLoss
-from vgg_loss.vgg_loss import VGGFeatures
+from losses.ScnnLoss_ariel import SCNNNetwork
+from losses.lap1_loss import LapLoss
+# from losses.mmd_exact_loss import MMDExact
+from losses.mmd_loss import MMDApproximate
+from losses.patch_loss import PatchRBFLoss, PatchRBFLaplacianLoss
+from losses.vgg_loss.vgg_loss import VGGFeatures
 
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 def mse_looss(x,y):
     return torch.mean((x.view(x.size(0),-1)-y.view(x.size(0),-1))**2, dim=1)

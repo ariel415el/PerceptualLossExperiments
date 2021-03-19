@@ -1,9 +1,6 @@
-import sys
 import torch
 import numpy as np
-
-sys.path.append('/home/ariel/universirty/PerceptualLoss/PerceptualLossGLO-Pytorch/losses')
-from mmd_loss import MMDApproximate
+from losses.mmd_loss import MMDApproximate
 
 
 class MMDpace:

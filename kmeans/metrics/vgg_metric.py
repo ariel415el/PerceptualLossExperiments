@@ -1,9 +1,7 @@
-import sys
 import torch
 import numpy as np
 
-sys.path.append('/home/ariel/universirty/PerceptualLoss/PerceptualLossGLO-Pytorch/losses')
-from vgg_loss.vgg_loss import VGGFeatures
+from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
 class VGGSpace:
