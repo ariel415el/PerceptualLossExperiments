@@ -16,8 +16,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def get_dataloaders(dataset_name):
     if dataset_name == "mnist":
-        train_dataset = utils.MnistDataset("../data/Mnist/train_Mnist.npy")
-        test_dataset = utils.MnistDataset("../data/Mnist/test_Mnist.npy")
+        train_dataset = utils.MnistDataset("../../../data/Mnist/train_Mnist.npy")
+        test_dataset = utils.MnistDataset("../../../data/Mnist/test_Mnist.npy")
         conf = mnist_configs
         train_dataloader = utils.get_dataloader(train_dataset, conf.batch_size, device)
         test_dataloader = utils.get_dataloader(test_dataset, conf.batch_size, device)
@@ -48,12 +48,12 @@ def get_dataloaders(dataset_name):
 def main():
     dataset_name = 'ffhq'
     train_dataloader, test_dataloader, conf = get_dataloaders(dataset_name)
-    train_dir = f"training_dir/{dataset_name}-vgg5-dcgan"
+    train_dir = f"test-training_dir/{dataset_name}-l2_3"
     # train_dir = f"training_dir/{dataset_name}-mmd-tests_2"
 
     glo = GLO(conf, dataset_size=len(train_dataloader.dataset), device=device)
-    # glo.train(train_dataloader, conf, outptus_dir=train_dir)
-    glo.load_weights(train_dir, device)
+    glo.train(train_dataloader, conf, outptus_dir=train_dir, start_epoch=0)
+    # glo.load_weights(train_dir, device)
 
     imle = IMLE(conf.e_dim, conf.z_dim)
     # imle.load_weights(train_dir, device)

@@ -1,0 +1,14 @@
+L2: 0.674
+VGG16-5-trained (x10): 0.727
+VGG16-4-trained (x10): 0.747
+VGG16-4-untrained: 0.682
+VGG16-4-initialized: 0.691
+VGG16-4-initialized-zero_mean: 0.692
+VGG16-4-initialized-zero_mean_first_only (x10): 0.736
+SCNN-radom-initialized (x2): 0.724
+Lap1-loss-5layers (x10): 0.671
+approximate_mmd_no-normalize: 0.688
+approximate_mmd_mean: 0.704
+approximate_mmd_channel-mean: 0.763
+approximate_mmd_channel-mean (16x8): 0.757
+PatchRBFLaplacianLoss_channel-mean (16x8): 0.70

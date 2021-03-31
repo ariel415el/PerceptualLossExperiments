@@ -6,23 +6,27 @@ import utils
 from KMeansFast import KMeansFast
 import torch
 import numpy as np
+import cv2
 
 from metrics.vgg_metric import VGGSpace
 from metrics.l2_metric import L2Metric
 from metrics.mmd_approximate_metric import MMDpace
-
-device = torch.device("cuda")
+# device = torch.device("cuda")
+device = torch.device("cpu")
 
 def main():
-    data, labels, img_size, dataset_name = utils.read_cifar_10_data('../../data/cifar-10-batches-py', limit_samples=1000)
-    # data, labels, img_size, dataset_name = utils.read_lfw_data('../../data/LFW', num_celebs=10)
+    # data, labels, img_size, dataset_name = utils.read_cifar_10_data('../../../data/cifar-10-batches-py', limit_samples=2000)
+    data, labels, img_size, dataset_name = utils.read_lfw_data('../../../data/LFW', num_celebs=10)
     num_trials = 1
-    kmeans = KMeansFast(n_clusters=len(np.unique(labels)), max_iter=15)
+    # num_clusters = len(np.unique(labels))
+    num_clusters = 20
 
-    # space_metric = VGGSpace(img_size, levels=5, mode='weighted-flatten')
-    # space_metric = VGGSpace(img_size, levels=5, mode='last')
+    kmeans = KMeansFast(n_clusters=num_clusters, max_iter=15)
+
+    space_metric = VGGSpace(img_size, levels=5, mode='weighted-flatten', pretrained=True)
+    # space_metric = VGGSpace(img_size, levels=5, mode='last', pretrained=False)
     # space_metric = L2Metric()
-    space_metric = MMDpace(num_features=2**17, spatial_mode='mean', patch_mode='mean')
+    # space_metric = MMDpace(num_features=2**17, spatial_mode='mean', patch_mode='mean')
     train_features = utils.extrac_features(space_metric.feature_extractor, data, batch_size=1, device=device)
 
     # utils.plot_imgs(kmeans.centroids, len(kmeans.centroids))
@@ -30,7 +34,7 @@ def main():
     f1s = []
     recals = []
     precisions = []
-    outputs_dir = os.path.join("output_dir", f"{dataset_name}_{space_metric.name}")
+    outputs_dir = os.path.join("pmo_output_dir", f"{dataset_name}_{space_metric.name}")
     for t in range(num_trials):
         print(f"#### Iteration : {t} ####", flush=True)
         os.makedirs(f"{outputs_dir}/{t}", exist_ok=True)
@@ -40,6 +44,11 @@ def main():
         for i in range(kmeans.n_clusters):
             cluster_data = data[kmeans.cluster_assignments == i] * 255
             utils.plot_imgs(cluster_data[:25], img_size, path=f"{outputs_dir}/{t}/C-{i}.png")
+            os.makedirs(f"{outputs_dir}/{t}/C-{i}-images", exist_ok=True)
+            for j, img in enumerate(cluster_data):
+                img = img.transpose(1,2,0)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(f"{outputs_dir}/{t}/C-{i}-images/{j}.png", img)
 
         print("Computing metrics...", end='')
         f1, recal, precision = utils.compute_metrics(kmeans, labels, report_path=f"{outputs_dir}/{t}/report.txt")

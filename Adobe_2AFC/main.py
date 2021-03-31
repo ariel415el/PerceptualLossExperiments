@@ -56,17 +56,17 @@ def score_2afc_dataset(data_loader, func, name=''):
 
 
 def main():
-    criterion = VGGFeatures(5).to(device)
+    # criterion = VGGFeatures(5, pretrained=True).to(device)
     # criterion = SCNNNetwork().to(device)
-    # criterion = MMDApproximate(batch_reduction='none', normalize_patch='none', pool_size=32, pool_strides=16).to(device)
+    criterion = MMDApproximate(batch_reduction='none', normalize_patch='channel_mean', pool_size=32, pool_strides=16).to(device)
     # criterion = MMDExact(batch_reduction='none').to(device)
     # criterion = LapLoss(max_levels=5, n_channels=3).to(device)
     # criterion = mse_looss
     # criterion = PatchRBFLaplacianLoss(patch_size=3, batch_reduction='none', normalize_patch='none', ignore_patch_norm=False).to(device)
 
-    dataloader = get_dataloader(["../../data/Perceptual2AFC/2afc/val/cnn",
-                                 "../../data/Perceptual2AFC/2afc/val/traditional"],
-                                batch_size=128,
+    dataloader = get_dataloader(["../../../data/Perceptual2AFC/2afc/val/cnn",
+                                 "../../../data/Perceptual2AFC/2afc/val/traditional"],
+                                batch_size=32,
                                 num_workers=4)
 
     scores = []

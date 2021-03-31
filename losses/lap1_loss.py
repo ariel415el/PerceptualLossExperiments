@@ -44,6 +44,7 @@ class LapLoss(nn.Module):
         super(LapLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = kernel_gauss(size=k_size, sigma=sigma, n_channels=n_channels)
+        self.name = f"Lap1_ML-{max_levels}"
 
     def forward(self, output, target):
         self._gauss_kernel = self._gauss_kernel.to(output.device)

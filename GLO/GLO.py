@@ -11,6 +11,8 @@ import utils
 import os
 import matplotlib.pyplot as plt
 
+from losses.l2 import L2
+from losses.mmd_loss import MMDApproximate
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
@@ -33,13 +35,12 @@ class GLO():
         self.duplicate_channels = glo_params.channels == 1
         self.pad_imgs = glo_params.img_dim == 28
 
-
         self.dists = [
-                         VGGFeatures(3 if glo_params.img_dim == 28 else 5).to(device),
+                        L2().to(device),
+                        # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
                         # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
-                        # torch.nn.MSELoss().to(self.device),
                         # PatchRBFLoss(3, device=self.device).to(self.device),
-                        # MMDApproximate(r=200, pool_size=32, pool_strides=16, normalize_patch='channel_mean').to(self.device),
+                        # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),
                         # self.dist = ScnnLoss().to(self.device)
         ]
 
@@ -82,6 +83,7 @@ class GLO():
 
             # rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
             rec_loss = sum([dist(Ii, images) for dist in self.dists])
+            # rec_loss = (self.dists[0] if epoch < 30 else self.dists[1])(Ii, images)
             rec_loss = rec_loss.mean()
             # Backward pass and optimization step
             rec_loss.backward()
@@ -118,5 +120,6 @@ class GLO():
         vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=False)
 
     def load_weights(self, ckp_dir, device):
+        print("Loading Z abd G weights")
         self.netZ.load_state_dict(torch.load(os.path.join(ckp_dir, 'netZ_nag.pth'), map_location=device))
         self.netG.load_state_dict(torch.load(os.path.join(ckp_dir, 'netG_nag.pth'), map_location=device))

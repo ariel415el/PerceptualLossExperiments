@@ -36,6 +36,7 @@ class PatchLoss(torch.nn.Module):
         self.normalize_patch = normalize_patch
         self.unfolder = torch.nn.Unfold(kernel_size=patch_size, stride=strides, padding=self.padding)
         self.ignore_patch_norm = ignore_patch_norm
+        self.name = 'PatchLoss'
 
     def _channel_reduction_op(self, diffs):
         raise NotImplementedError()

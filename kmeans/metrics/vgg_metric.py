@@ -5,16 +5,16 @@ from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
 class VGGSpace:
-    def __init__(self, img_dim, levels, mode):
-        self.name = f"VGG-dist-(i-{img_dim}_l-{levels}_m-{mode})"
-        self.feature_extractor = VGGWrapper(levels, mode)
+    def __init__(self, img_dim, levels, mode, pretrained):
+        self.name = f"VGG-dist-(i-{img_dim}_l-{levels}_m-{mode}_pt-{pretrained})"
+        self.feature_extractor = VGGWrapper(levels, mode, pretrained)
         self.metric = FlattenVGGDist(img_dim, levels, mode)
 
 
 class VGGWrapper(torch.nn.Module):
-    def __init__(self, levels, mode):
+    def __init__(self, levels, mode, pretrained):
         super(VGGWrapper, self).__init__()
-        self.vgg = VGGFeatures(levels)
+        self.vgg = VGGFeatures(levels, pretrained=pretrained)
         self.mode = mode
 
     def get_fv(self, x):
