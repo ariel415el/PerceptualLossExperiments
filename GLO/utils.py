@@ -49,6 +49,8 @@ class DiskDataset(Dataset):
         img = cv2.resize(img, (64, 64)) / 255.0
         img = img.transpose((2, 0, 1))
 
+        img = 2 * img - 1  # transform to -1 1
+
         return idx, img
 
 
@@ -63,7 +65,10 @@ class MemoryDataset(Dataset):
             if self.crop:
                 img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
             img = cv2.resize(img, (64, 64)) / 255.0
+            img = 2 * img - 1  # transform to -1 1
+
             img = img.transpose((2, 0, 1))
+
             self.images.append(img)
 
         self.images = np.array(self.images)

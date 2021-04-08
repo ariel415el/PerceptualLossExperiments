@@ -48,10 +48,11 @@ def get_dataloaders(dataset_name):
 def main():
     dataset_name = 'ffhq'
     train_dataloader, test_dataloader, conf = get_dataloaders(dataset_name)
-    train_dir = f"test-random-training_dir/{dataset_name}"
-    # train_dir = f"training_dir/{dataset_name}-mmd-tests_2"
 
     glo = GLO(conf, dataset_size=len(train_dataloader.dataset), device=device)
+
+    train_dir = f"test-random-training_dir/{dataset_name}_{glo.loss.name}"
+
     glo.train(train_dataloader, conf, outptus_dir=train_dir, start_epoch=0)
     # glo.load_weights(train_dir, device)
 

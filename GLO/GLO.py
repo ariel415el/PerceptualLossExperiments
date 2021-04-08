@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from losses.l2 import L2
 from losses.mmd_loss import MMDApproximate
+from losses.utils import ListOfLosses
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
@@ -35,14 +36,14 @@ class GLO():
         self.duplicate_channels = glo_params.channels == 1
         self.pad_imgs = glo_params.img_dim == 28
 
-        self.dists = [
+        self.loss = ListOfLosses([
                         # L2().to(device),
                         VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
                         # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
                         # PatchRBFLoss(3, device=self.device).to(self.device),
                         # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),
                         # self.dist = ScnnLoss().to(self.device)
-        ]
+        ])
 
     def train(self, dataloader, opt_params, vis_epochs=1, outptus_dir='runs', start_epoch=0):
         os.makedirs(outptus_dir, exist_ok=True)
@@ -82,8 +83,7 @@ class GLO():
             Ii = self.netG(zi)
 
             # rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
-            rec_loss = sum([dist(Ii, images) for dist in self.dists])
-            # rec_loss = (self.dists[0] if epoch < 30 else self.dists[1])(Ii, images)
+            rec_loss = self.loss(Ii, images)
             rec_loss = rec_loss.mean()
             # Backward pass and optimization step
             rec_loss.backward()
