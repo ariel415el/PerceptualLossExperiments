@@ -8,10 +8,12 @@ cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 
 
 
 class VGGFeatures(nn.Module):
-    def __init__(self, level, pretrained=True):
+    def __init__(self, level, pretrained=True, post_relu=False):
         super(VGGFeatures, self).__init__()
-        # self.layer_ids = [2, 7, 14, 21, 30][:level]
-        self.layer_ids = [3, 8, 15, 22, 29][:level]
+        if post_relu:
+            self.layer_ids = [3, 8, 15, 22, 29][:level]
+        else:
+            self.layer_ids = [2, 7, 14, 21, 30][:level]
         self.level = level
 
         self.normalize_input = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -39,10 +41,11 @@ class VGGFeatures(nn.Module):
                         feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
                     torch.nn.init.constant_(feat.bias, 0.)
 
-        self.name = f"VGG_L-{level}" + ("_PT" if pretrained else '')
+        self.name = f"VGG_L-{level}" + ("_PT" if pretrained else '') + ("_PR" if post_relu else '')
 
-    def get_activations(self, z):
-        # z = self.normalize_input(z)
+    def get_activations(self, z, normalize=False):
+        if normalize:
+            z = self.normalize_input(z)
         id_max = self.layer_ids[-1] + 1
         activations = []
         for i in range(id_max):

@@ -36,8 +36,8 @@ class GLO():
         self.pad_imgs = glo_params.img_dim == 28
 
         self.dists = [
-                        L2().to(device),
-                        # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
+                        # L2().to(device),
+                        VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
                         # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
                         # PatchRBFLoss(3, device=self.device).to(self.device),
                         # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),

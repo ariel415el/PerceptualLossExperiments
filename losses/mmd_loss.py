@@ -66,7 +66,7 @@ class MMDApproximate(torch.nn.Module):
 
         self.padding = self.ksize // 2 if pad_image else 0
 
-        self.name = f"MMD-Appro_r-{r}_p-{normalize_patch}"
+        self.name = f"MMD-Appro_r-{r}_p-{normalize_patch}_{pool_size}-{pool_strides}"
 
     def get_activations(self, x):
         if self.padding > 0:

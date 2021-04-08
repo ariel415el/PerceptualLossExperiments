@@ -48,7 +48,7 @@ def get_dataloaders(dataset_name):
 def main():
     dataset_name = 'ffhq'
     train_dataloader, test_dataloader, conf = get_dataloaders(dataset_name)
-    train_dir = f"test-training_dir/{dataset_name}-l2_3"
+    train_dir = f"test-random-training_dir/{dataset_name}"
     # train_dir = f"training_dir/{dataset_name}-mmd-tests_2"
 
     glo = GLO(conf, dataset_size=len(train_dataloader.dataset), device=device)

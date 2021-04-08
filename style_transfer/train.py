@@ -52,6 +52,9 @@ def extract_features(model, x, layers):
 
 
 def network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_size, save_path, device):
+    """
+    Train a translation model that changes the style of its input to the style of the reference style image
+    """
     os.makedirs(save_path, exist_ok=True)
 
     train_dataset = ImageFolder(images_dir, get_transformer(img_size, crop_size))
@@ -127,6 +130,9 @@ def network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_
     return transform_network
 
 def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, save_path, device):
+    """
+    Optimize an input image that mix style and content of specific two other images
+    """
     os.makedirs(save_path, exist_ok=True)
     content_image = imload(content_img_path, imsize=img_size).to(device)
     style_image = imload(style_img_path, imsize=img_size).to(device)
@@ -172,7 +178,7 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, m
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     max_iter = 15000
-    lr = 0.1
+    lr = 0.2
     batch_size = 6
     img_size = 256
     crop_size = 240
@@ -184,14 +190,15 @@ if __name__ == '__main__':
     # import torchvision
     # loss_network = torchvision.models.__dict__['vgg16'](pretrained=True).features.to(device)
 
-    loss_network = VGGFeatures(4, pretrained=True).to(device)
+    loss_network = VGGFeatures(5, pretrained=True, post_relu=True).to(device)
 
-    train_dir = 'network_outputs/starry_night-pretrained'
-    style_img_path = 'imgs/style/starry_night.jpg'
-    images_dir = 'dataset'
-    network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_size, train_dir, device)
+    # train_dir = 'network_outputs/starry_night-pretrained'
+    # style_img_path = 'imgs/style/starry_night.jpg'
+    # images_dir = 'dataset'
+    # network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_size, train_dir, device)
 
-    # train_dir = 'optimize_output/home_alone-bradd_pitt_pretrained'
-    # style_img_path = 'imgs/style/yellow_sunset.jpg'
-    # content_img_path = 'imgs/content/home_alone.jpg'
-    # style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, train_dir, device)
+    train_dir = 'optimize_output/2_faces_mix_2'
+    train_dir += f"#{loss_network.name}"
+    style_img_path = 'imgs/faces/00100.png'
+    content_img_path = 'imgs/faces/00001.png'
+    style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, train_dir, device)
