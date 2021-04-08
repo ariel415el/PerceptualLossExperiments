@@ -28,6 +28,8 @@ def get_dataloaders(dataset_name):
             dataset_type = utils.DiskDataset
         else:
             train_samples_path = "../../../data/FFHQ/thumbnails128x128"
+            if not os.path.exists(train_samples_path):
+                utils.download_ffhq_thumbnails(os.path.dirname(train_samples_path))
             dataset_type = utils.MemoryDataset
 
         img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]

@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import cv2
 
+
 def sample_gaussian(x, m, mu=None, cov=None):
     if mu is None:
         mu, cov = get_mu_sigma(x)
@@ -91,3 +92,12 @@ class MnistDataset(Dataset):
 
     def __getitem__(self, idx):
         return idx, self.imgs[idx]
+
+
+def download_ffhq_thumbnails(data_dir):
+    print("Downloadint FFHQ-thumbnails from kaggle...")
+    os.environ['KAGGLE_USERNAME'] = "ariel415el"
+    os.environ['KAGGLE_KEY'] = "831db7b1693cd81d31ce16e340ddba03"
+    import kaggle
+    kaggle.api.dataset_download_files('greatgamedota/ffhq-face-data-set', path=data_dir, unzip=True, quiet=False)
+    print("Done.")

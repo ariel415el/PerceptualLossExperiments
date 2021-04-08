@@ -1,6 +1,9 @@
 import torch
 import numpy as np
 
+import os
+import sys
+sys.path.append(os.path.realpath(".."))
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
 

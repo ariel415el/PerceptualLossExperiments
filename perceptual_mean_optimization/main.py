@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+import sys
+sys.path.append(os.path.realpath(".."))
 # from losses.mmd_exact_loss import MMDExact
 from losses.utils import ListOfLosses
 from losses.vgg_loss.vgg_loss import VGGFeatures

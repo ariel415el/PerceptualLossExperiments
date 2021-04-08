@@ -44,7 +44,8 @@ class _netG(nn.Module):
         self.conv1 = nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=True)
         self.bn_conv = nn.BatchNorm2d(64)
         self.conv2 = nn.ConvTranspose2d(64, nc, 4, 2, 1, bias=True)
-        self.sig = nn.Sigmoid()
+        # self.output_nl = nn.Sigmoid()  # to [0,1]
+        self.output_nl = nn.Tanh()  # tp [-1,1]
         self.do_bn = do_bn
         # self.nonlin = nn.SELU(True)
         self.nonlin = nn.LeakyReLU(0.2, inplace=True)
@@ -62,7 +63,7 @@ class _netG(nn.Module):
             z = self.bn_conv(z)
         z = self.nonlin(z)
         z = self.conv2(z)
-        z = self.sig(z)
+        z = self.output_nl(z)
         return z
 
     def forward(self, z):

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 class L2Metric:
     def __init__(self):
         self.name = f"L2"

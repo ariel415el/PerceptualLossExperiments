@@ -11,13 +11,15 @@ import utils
 import os
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append(os.path.realpath(".."))
 from losses.l2 import L2
 from losses.mmd_loss import MMDApproximate
 from losses.utils import ListOfLosses
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
 
-class GLO():
+class GLO:
     def __init__(self, glo_params, dataset_size, device):
         self.dataset_size = dataset_size
         self.device = device
@@ -37,8 +39,8 @@ class GLO():
         self.pad_imgs = glo_params.img_dim == 28
 
         self.loss = ListOfLosses([
-                        # L2().to(device),
-                        VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
+                        L2().to(device),
+                        # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
                         # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
                         # PatchRBFLoss(3, device=self.device).to(self.device),
                         # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),
@@ -76,19 +78,21 @@ class GLO():
             # Put numpy data into tensors
             indices = indices.long().to(self.device)
             images = images.float().to(self.device)
+
             # Forward pass
             self.netZ.zero_grad()
             self.netG.zero_grad()
             zi = self.netZ(indices)
             Ii = self.netG(zi)
 
-            # rec_loss = self.dist(2 * Ii - 1, 2 * images - 1)
             rec_loss = self.loss(Ii, images)
             rec_loss = rec_loss.mean()
+
             # Backward pass and optimization step
             rec_loss.backward()
             optimizerG.step()
             optimizerZ.step()
+
             er += rec_loss.item()
             pbar.set_description(f"im/sec: {i * opt_params.batch_size / (time() - start):.2f}")
         self.netZ.get_norm()
@@ -107,17 +111,17 @@ class GLO():
                               normalize=False)
         # fixed latent Generated images
         Igen = self.netG(self.fixed_noise)
-        vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=False)
+        vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=True)
 
         # Generated from sampled latent vectors
         z = utils.sample_gaussian(self.netZ.emb.weight.clone().cpu(), self.num_debug_imgs).to(self.device)
         Igauss = self.netG(z)
-        vutils.save_image(Igauss.data, os.path.join(outptus_dir, 'imgs', 'generate_sampled',f"epoch_{epoch}.png"), normalize=False)
+        vutils.save_image(Igauss.data, os.path.join(outptus_dir, 'imgs', 'generate_sampled',f"epoch_{epoch}.png"), normalize=True)
 
         # Reconstructed images
         idx = torch.from_numpy(debug_indices).to(self.device)
         Irec = self.netG(self.netZ(idx))
-        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=False)
+        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=True)
 
     def load_weights(self, ckp_dir, device):
         print("Loading Z abd G weights")

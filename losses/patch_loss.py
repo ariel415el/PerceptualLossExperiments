@@ -5,7 +5,7 @@ from torch.nn.functional import conv2d
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from mmd_loss import get_reduction_fn
+from losses.mmd_loss import get_reduction_fn
 
 
 class PatchLoss(torch.nn.Module):
