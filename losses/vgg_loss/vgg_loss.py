@@ -10,8 +10,10 @@ cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 
 class VGGFeatures(nn.Module):
     def __init__(self, level, pretrained=True, post_relu=False):
         super(VGGFeatures, self).__init__()
+        self.name = f"VGG_L-{level}"
         if post_relu:
             self.layer_ids = [3, 8, 15, 22, 29][:level]
+            self.name += "_PR"
         else:
             self.layer_ids = [2, 7, 14, 21, 30][:level]
         self.level = level
@@ -29,9 +31,16 @@ class VGGFeatures(nn.Module):
         self.features = nn.Sequential(*features)
 
         if pretrained:
-            self.load_state_dict(torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16_head.pth")))
-            # self.load_state_dict(torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16-faceGender_features.pth")))
+            weigths = torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16_head.pth"))
+            self.load_state_dict(weigths)
+            self.name += "_PT"
+            # weigths = {k:v for k,v in weigths.items() if k in ['features.0.weight', 'features.0.bias']}
+            # model_dict = self.state_dict()
+            # model_dict.update(weigths)
+            # self.load_state_dict(model_dict)
+            # self.name += "_PT_only-first_layer"
         else:
+            # self.name += "all-random"
             i = 0
             for feat in self.features:
                 if type(feat) == torch.nn.Conv2d:
@@ -40,8 +49,6 @@ class VGGFeatures(nn.Module):
                         i += 1
                         feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
                     torch.nn.init.constant_(feat.bias, 0.)
-
-        self.name = f"VGG_L-{level}" + ("_PT" if pretrained else '') + ("_PR" if post_relu else '')
 
     def get_activations(self, z, normalize=False):
         if normalize:

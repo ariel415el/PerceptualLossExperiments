@@ -48,12 +48,13 @@ def get_dataloaders(dataset_name):
 
 
 def main():
+    train_tag = "-No-z-normalization"
     dataset_name = 'ffhq'
     train_dataloader, test_dataloader, conf = get_dataloaders(dataset_name)
 
     glo = GLO(conf, dataset_size=len(train_dataloader.dataset), device=device)
 
-    train_dir = f"test-random-training_dir/{dataset_name}_{glo.loss.name}"
+    train_dir = f"test-GLO_variants/{dataset_name}_{glo.loss.name}_{train_tag}"
 
     glo.train(train_dataloader, conf, outptus_dir=train_dir, start_epoch=0)
     # glo.load_weights(train_dir, device)
@@ -65,7 +66,7 @@ def main():
 
     z = imle.netT(torch.randn(64, imle.e_dim).cuda())
     ims = glo.netG(z)
-    vutils.save_image(ims, f"{train_dir}/imgs/IMLE-sampled.png", normalize=False)
+    vutils.save_image(ims, f"{train_dir}/imgs/IMLE-sampled.png", normalize=True)
 
     test_trained_model(train_dir, glo, imle, test_dataloader, train_dataloader, device)
 

@@ -12,6 +12,9 @@ import os
 import matplotlib.pyplot as plt
 
 import sys
+
+from losses.lap1_loss import LapLoss
+
 sys.path.append(os.path.realpath(".."))
 from losses.l2 import L2
 from losses.mmd_loss import MMDApproximate
@@ -39,8 +42,8 @@ class GLO:
         self.pad_imgs = glo_params.img_dim == 28
 
         self.loss = ListOfLosses([
-                        L2().to(device),
-                        # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False).to(device),
+                        # L2().to(device),
+                        VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True).to(device),
                         # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
                         # PatchRBFLoss(3, device=self.device).to(self.device),
                         # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),
@@ -107,8 +110,7 @@ class GLO:
             os.makedirs(os.path.join(outptus_dir, "imgs", "reconstructions"), exist_ok=True)
             # dumpy original images fro later reconstruction debug images
             first_imgs = torch.from_numpy(np.array([dataset[x][1] for x in debug_indices]))
-            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'),
-                              normalize=False)
+            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'), normalize=True)
         # fixed latent Generated images
         Igen = self.netG(self.fixed_noise)
         vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=True)

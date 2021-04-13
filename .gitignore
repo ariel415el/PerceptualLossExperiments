@@ -7,6 +7,8 @@
 /kmeans/pmo_output_dir
 /perceptual_mean_optimization/outputs
 /GLO/test-training_dir
+/GLO/test-random-training_dir
+/GLO/test-GLO_variants
 /style_transfer/network_outputs
 /style_transfer/optimize_output
 /style_transfer/imgs
