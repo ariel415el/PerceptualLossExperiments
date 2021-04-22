@@ -45,7 +45,6 @@ class IMLE():
 
         torch.save(self.netT.state_dict(), f"{train_dir}/netT_nag.pth")
 
-
     def train_epoch(self, z_np, epoch):
         # Compute batch size
         batch_size = self.batch_size

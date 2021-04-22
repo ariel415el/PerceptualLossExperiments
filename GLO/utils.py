@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import cv2
 
+from config import mnist_configs, faces_config
 
 def sample_gaussian(x, m, mu=None, cov=None):
     if mu is None:
@@ -101,3 +102,36 @@ def download_ffhq_thumbnails(data_dir):
     import kaggle
     kaggle.api.dataset_download_files('greatgamedota/ffhq-face-data-set', path=data_dir, unzip=True, quiet=False)
     print("Done.")
+
+
+def get_dataloaders(dataset_name, device):
+    if dataset_name == "mnist":
+        train_dataset = MnistDataset("../../../data/Mnist/train_Mnist.npy")
+        test_dataset = MnistDataset("../../../data/Mnist/test_Mnist.npy")
+        conf = mnist_configs
+        train_dataloader = get_dataloader(train_dataset, conf.batch_size, device)
+        test_dataloader = get_dataloader(test_dataset, conf.batch_size, device)
+
+    elif dataset_name in ['celeba', 'ffhq']:
+        if dataset_name == 'celeba':
+            train_samples_path = "../../../data/img_align_celeba"
+            dataset_type = DiskDataset
+        else:
+            train_samples_path = "../../../data/FFHQ/thumbnails128x128"
+            if not os.path.exists(train_samples_path):
+                download_ffhq_thumbnails(os.path.dirname(train_samples_path))
+            dataset_type = MemoryDataset
+
+        img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
+        np.random.shuffle(img_paths)
+        val_size = int(0.15 * len(img_paths))
+        train_dataset = dataset_type(img_paths[val_size:])
+        test_dataset = dataset_type(img_paths[:val_size])
+
+        conf = faces_config
+        train_dataloader = get_dataloader(train_dataset, conf.batch_size, device)
+        test_dataloader = get_dataloader(test_dataset, conf.batch_size, device)
+    else:
+        raise ValueError("No such dataset")
+
+    return train_dataloader, test_dataloader, conf

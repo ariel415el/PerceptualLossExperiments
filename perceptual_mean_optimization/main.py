@@ -30,7 +30,6 @@ def cv2pt(img):
 
 
 def pt2cv(img):
-    img = img
     img = (img + 1) / 2
     img = np.clip(img, 0, 1)
     img *= 255

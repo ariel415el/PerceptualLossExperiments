@@ -120,3 +120,37 @@ class DCGANGenerator(nn.Module):
         input = input.view(input.size(0), input.size(1), 1, 1)
         output = self.network(input)
         return output
+
+
+if __name__ == '__main__':
+    ### Optimize the model to output a single specific image
+    import torch
+    import cv2
+    import torchvision.utils as vutils
+
+    target = cv2.imread('/home/ariel/universirty/data/FFHQ/thumbnails128x128/00009.png')
+    target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
+    target = cv2.resize(target, (64, 64)) / 255.0
+    target = 2 * target - 1  # transform to -1 1
+    target = target.transpose(2, 0, 1)
+    target = torch.from_numpy(target).unsqueeze(0).float()
+    vutils.save_image(target[0], 'generated.png', normalize=True)
+    input = torch.randn(64).unsqueeze(0)
+    input.requires_grad_(True)
+
+    model = DCGANGenerator(64,3,64)
+
+    optimizer = torch.optim.SGD(list(model.parameters()) + [input], lr=0.01)
+    # optimizer = torch.optim.Adam(list(model.parameters()), lr=0.1)
+
+    for i in range(10000):
+        if (i+1) % 100 == 0:
+            for g in optimizer.param_groups:
+                g['lr'] *= 0.8
+            print(i, loss.item())
+            vutils.save_image(output[0], 'generated.png',normalize=True)
+        output = model(input)
+        loss = torch.nn.MSELoss()(output, target)
+        loss.backward()
+        optimizer.step()
+

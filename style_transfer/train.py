@@ -59,6 +59,7 @@ def network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_
 
     train_dataset = ImageFolder(images_dir, get_transformer(img_size, crop_size))
     target_style_image = imload(style_img_path, imsize=img_size).to(device)
+    # target_style_image = cv2pt(cv2.imread(style_img_path), imsize=img_size).to(device)
 
     # Transform Network
     transform_network = TransformNetwork()
@@ -150,7 +151,7 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, m
     style_activations = loss_network.get_activations(style_image)
     style_activations = [style_activations[i] for i in style_layers]
 
-    pbar = tqdm(range(max_iter))
+    pbar = tqdm(range(max_iter + 1))
     for iteration in pbar:
         target_activations = loss_network.get_activations(target_img)
         target_style_activations = [target_activations[i] for i in style_layers]
@@ -168,7 +169,7 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, m
         # print loss logs
         if iteration % 250 == 0:
             for g in optimizer.param_groups:
-                g['lr'] *= 0.95
+                g['lr'] *= 0.75
 
             pbar.set_description(f"total_loss: {total_loss}")
 
@@ -177,9 +178,9 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, m
 
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    max_iter = 15000
-    lr = 0.2
-    batch_size = 6
+    max_iter = 3000
+    lr = 0.5
+    batch_size = 1
     img_size = 256
     crop_size = 240
     # content_layers = [15]
@@ -197,8 +198,7 @@ if __name__ == '__main__':
     # images_dir = 'dataset'
     # network_train(images_dir, style_img_path, loss_network, lr, max_iter, batch_size, train_dir, device)
 
-    train_dir = 'optimize_output/2_faces_mix_2'
-    train_dir += f"#{loss_network.name}"
-    style_img_path = 'imgs/faces/00100.png'
-    content_img_path = 'imgs/faces/00001.png'
+    train_dir = f"optimize_output/starry_night-cornell-{loss_network.name}"
+    style_img_path = 'imgs/style/starry_night.jpg'
+    content_img_path = 'imgs/content/chicago.jpg'
     style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, train_dir, device)
