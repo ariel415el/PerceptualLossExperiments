@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,6 +8,8 @@ import torch.utils.data
 import collections
 import faiss
 import os
+
+from tqdm import tqdm
 
 
 class _netT(nn.Module):
@@ -32,18 +35,25 @@ class _netT(nn.Module):
         return z
 
 class IMLE():
-    def __init__(self, e_dim, z_dim):
+    def __init__(self, e_dim, z_dim, device):
         self.e_dim = e_dim
         self.z_dim = z_dim
-        self.netT = _netT(e_dim, z_dim).cuda()
+        self.netT = _netT(e_dim, z_dim).to(device)
+        self.name = f"IMLE-sampler"
 
     def train(self, z_np, train_dir, lr=1e-3, batch_size=128, epochs=50):
         self.lr = lr
         self.batch_size = batch_size
+        pbar = tqdm(range(epochs))
+        losses = []
         for epoch in range(epochs):
-            self.train_epoch(z_np, epoch)
+            error = self.train_epoch(z_np, epoch)
+            pbar.set_description("IMLE: Epoch: %d Error: %f" % (epoch, error))
+            losses.append(error)
 
         torch.save(self.netT.state_dict(), f"{train_dir}/netT_nag.pth")
+        plt.plot(range(len(losses)), losses)
+        plt.savefig(f"{train_dir}/imgs/IMLE-train-loss.png")
 
     def train_epoch(self, z_np, epoch):
         # Compute batch size
@@ -88,7 +98,7 @@ class IMLE():
             er += loss.item()
             optimizerT.step()
 
-        print("Epoch: %d Error: %f" % (epoch, er / batch_n))
+        return er / batch_n
 
     def load_weights(self, ckp_dir, device):
         self.netT.load_state_dict(torch.load(os.path.join(ckp_dir, 'netT_nag.pth'), map_location=device))

@@ -123,7 +123,7 @@ def get_dataloaders(dataset_name, device):
             dataset_type = MemoryDataset
 
         img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
-        np.random.shuffle(img_paths)
+        # np.random.shuffle(img_paths)  # Avoid mixing the test and train for test consistency
         val_size = int(0.15 * len(img_paths))
         train_dataset = dataset_type(img_paths[val_size:])
         test_dataset = dataset_type(img_paths[:val_size])

@@ -9,12 +9,12 @@ from utils import MemoryDataset
 from IMLE import _netT
 from fid_scroe.fid_score import calculate_frechet_distance
 from fid_scroe.inception import InceptionV3
-from model import DCGANGenerator
+from models import DCGANGenerator
 from config import faces_config
 import torchvision.utils as vutils
 
 
-def run_FID_tests(train_dir, glo_model, imle_model, test_dataloader, train_dataloader, device):
+def run_FID_tests(train_dir, glo_model, imle_model, gmmn_model, test_dataloader, train_dataloader, device):
     """Compute The FID score of the train, GLO, IMLE and reconstructed images distribution compared
      to the test distribution"""
     inception_model = InceptionV3([3]).to(device).eval()
@@ -23,6 +23,7 @@ def run_FID_tests(train_dir, glo_model, imle_model, test_dataloader, train_datal
     train_activations = []
     glo_gen_activations = []
     imle_gen_activations = []
+    gmmn_gen_activations = []
     rec_activations = []
 
     print("Computing Inception activations")
@@ -58,11 +59,17 @@ def run_FID_tests(train_dir, glo_model, imle_model, test_dataloader, train_datal
             act = inception_model.get_activations(images, device).astype(np.float64)
             imle_gen_activations.append(act)
 
+            images = glo_model.netG(gmmn_model.netT(torch.randn(test_dataloader.batch_size, gmmn_model.e_dim).to(device)))
+            act = inception_model.get_activations(images, device).astype(np.float64)
+            gmmn_gen_activations.append(act)
+
+
     train_activations = np.concatenate(train_activations, axis=0)
     test_activations = np.concatenate(test_activations, axis=0)
     glo_gen_activations = np.concatenate(glo_gen_activations, axis=0)
     rec_activations = np.concatenate(rec_activations, axis=0)
     imle_gen_activations = np.concatenate(imle_gen_activations, axis=0)
+    gmmn_gen_activations = np.concatenate(gmmn_gen_activations, axis=0)
 
     print(f"Computing activations mean and covariances on {test_activations.shape[0]} samples")
 
@@ -71,18 +78,21 @@ def run_FID_tests(train_dir, glo_model, imle_model, test_dataloader, train_datal
     glo_gen_mu, glo_gen_cov = np.mean(glo_gen_activations, axis=0), np.cov(glo_gen_activations, rowvar=False)
     rec_mu, rec_cov = np.mean(rec_activations, axis=0), np.cov(rec_activations, rowvar=False)
     imle_gen_mu, imle_gen_cov = np.mean(imle_gen_activations, axis=0), np.cov(imle_gen_activations, rowvar=False)
+    gmmn_gen_mu, gmmn_gen_cov = np.mean(gmmn_gen_activations, axis=0), np.cov(gmmn_gen_activations, rowvar=False)
 
     print("Computing FID scores")
     opt_fid = calculate_frechet_distance(test_mu, test_cov, train_mu, train_cov)
     glo_gen_fid = calculate_frechet_distance(test_mu, test_cov, glo_gen_mu, glo_gen_cov)
     rec_fid = calculate_frechet_distance(test_mu, test_cov, rec_mu, rec_cov)
     imle_gen_fid = calculate_frechet_distance(test_mu, test_cov, imle_gen_mu, imle_gen_cov)
+    gmmn_gen_fid = calculate_frechet_distance(test_mu, test_cov, gmmn_gen_mu, gmmn_gen_cov)
 
     f = open(os.path.join(train_dir, "FID-scores.txt"), 'w')
     f.write(f"Optimal scores (Train vs test) FID: {opt_fid:.2f}\n")
     f.write(f"GLO-Generated images FID: {glo_gen_fid:.2f}\n")
     f.write(f"Reconstructed train images FID: {rec_fid:.2f}\n")
     f.write(f"IMLE-Generated images FID: {imle_gen_fid:.2f}\n")
+    f.write(f"GMMN-Generated images FID: {gmmn_gen_fid:.2f}\n")
     f.close()
 
 
@@ -101,7 +111,7 @@ def plot_reconstructions(generator, latent_encoding, train_dir, n):
     indices = torch.from_numpy(np.random.randint(0, n, 64))
 
     imgs = generator(latent_encoding(indices))
-    vutils.save_image(imgs, f"{train_dir}/Reconstructions.png", normalize=True, nrow=8)
+    vutils.save_image(imgs, f"{train_dir}/imgs/Reconstructions.png", normalize=True, nrow=8)
 
 
 def plot_interpolations(generator, latent_sampler, train_dir, z_interpolation=False):
@@ -130,20 +140,20 @@ def plot_interpolations(generator, latent_sampler, train_dir, z_interpolation=Fa
             rearanged_images.append(imgs[i*num_sets + j])
     imgs = torch.stack(rearanged_images)
 
-    vutils.save_image(imgs, f"{train_dir}/{'z' if z_interpolation else 'e'}-Interpolations.png", normalize=True, nrow=num_steps)
+    vutils.save_image(imgs, f"{train_dir}/imgs/{'z' if z_interpolation else 'e'}-Interpolations.png", normalize=True, nrow=num_steps)
 
 
 if __name__ == '__main__':
-    train_dir = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/global-optimizers/ffhq_VGG_L-5_PR_PT#Lap1_ML-5_-No-z-normalization'
+    train_dir = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/global-optimizers/ffhq_VGG_L-5_PR_PT_-No-z-normalization'
 
     # Load models
     generator = DCGANGenerator(faces_config.z_dim, faces_config.channels, faces_config.img_dim)
-    generator.load_state_dict(torch.load(os.path.join(train_dir, 'netG_nag.pth'), map_location=torch.device('cpu')))
+    generator.load_state_dict(torch.load(os.path.join(train_dir, 'netG.pth'), map_location=torch.device('cpu')))
 
     latent_sampler = _netT(faces_config.e_dim, faces_config.z_dim)
-    latent_sampler.load_state_dict(torch.load(os.path.join(train_dir, 'netT_nag.pth'), map_location=torch.device('cpu')))
+    latent_sampler.load_state_dict(torch.load(os.path.join(train_dir, 'netT.pth'), map_location=torch.device('cpu')))
 
-    latent_encoding_weights = torch.load(os.path.join(train_dir, 'netZ_nag.pth'), map_location=torch.device('cpu'))
+    latent_encoding_weights = torch.load(os.path.join(train_dir, 'netZ.pth'), map_location=torch.device('cpu'))
     n, nz = latent_encoding_weights['emb.weight'].shape
     latent_encodings = torch.nn.Embedding(n, nz)
     latent_encodings.load_state_dict({'weight':latent_encoding_weights['emb.weight']})

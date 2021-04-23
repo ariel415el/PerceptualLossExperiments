@@ -6,7 +6,7 @@ import torch.utils.data
 import torchvision.utils as vutils
 from tqdm import tqdm
 from time import time
-import model
+import models
 import utils
 import os
 import matplotlib.pyplot as plt
@@ -17,7 +17,8 @@ import sys
 sys.path.append(os.path.realpath(".."))
 from losses.l2 import L2
 from losses.lap1_loss import LapLoss
-from losses.mmd_loss import MMDApproximate
+from losses.patch_mmd_loss import MMDApproximate
+from losses.mmd_loss import MMD
 from losses.utils import ListOfLosses
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
@@ -26,13 +27,13 @@ class GLO:
     def __init__(self, glo_params, dataset_size, device):
         self.dataset_size = dataset_size
         self.device = device
-        self.netZ = model._netZ(glo_params.z_dim, dataset_size)
-        self.netZ.apply(model.weights_init)
+        self.netZ = models.LatentCodesDict(glo_params.z_dim, dataset_size)
+        self.netZ.apply(models.weights_init)
         self.netZ.to(self.device)
 
         # self.netG = model._netG(glo_params.z_dim, glo_params.img_dim, glo_params.channels, glo_params.use_bn)
-        self.netG = model.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
-        self.netG.apply(model.weights_init)
+        self.netG = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
+        self.netG.apply(models.weights_init)
         self.netG.to(self.device)
 
         self.num_debug_imgs = 64
@@ -43,8 +44,9 @@ class GLO:
 
         self.loss = ListOfLosses([
                         # L2().to(device),
-                        VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True).to(device),
-                        LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
+                        VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=True, post_relu=True).to(device),
+                        # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels).to(device),
+                        # MMD()
                         # PatchRBFLoss(3, device=self.device).to(self.device),
                         # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean').to(self.device),
                         # self.dist = ScnnLoss().to(self.device)
@@ -100,7 +102,7 @@ class GLO:
 
             er += rec_loss.item()
             pbar.set_description(f"im/sec: {i * opt_params.batch_size / (time() - start):.2f}")
-        # self.netZ.get_norm()
+        self.netZ.get_norm()
         er = er / (i + 1)
         return er
 
@@ -128,6 +130,6 @@ class GLO:
         vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=True)
 
     def load_weights(self, ckp_dir, device):
-        print("Loading Z abd G weights")
+        print("GLO: Loading Z and G weights")
         self.netZ.load_state_dict(torch.load(os.path.join(ckp_dir, 'netZ_nag.pth'), map_location=device))
         self.netG.load_state_dict(torch.load(os.path.join(ckp_dir, 'netG_nag.pth'), map_location=device))

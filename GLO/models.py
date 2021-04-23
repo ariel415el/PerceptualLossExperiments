@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
+
 def weights_init(m):
     classname = m.__class__.__name__
     if isinstance(m, nn.Linear):
@@ -15,9 +16,9 @@ def weights_init(m):
         init.normal_(m.weight, mean=0, std=0.01)
 
 
-class _netZ(nn.Module):
+class LatentCodesDict(nn.Module):
     def __init__(self, nz, n):
-        super(_netZ, self).__init__()
+        super(LatentCodesDict, self).__init__()
         self.n = n
         self.emb = nn.Embedding(self.n, nz)
         self.nz = nz
@@ -31,9 +32,9 @@ class _netZ(nn.Module):
         return z
 
 
-class _netG(nn.Module):
+class InfoGanGenerator(nn.Module):
     def __init__(self, nz, sz, nc, do_bn=False):
-        super(_netG, self).__init__()
+        super(InfoGanGenerator, self).__init__()
         self.sz = sz
         self.dim_im = 128 * (sz // 4) * (sz // 4)
         self.lin_in = nn.Linear(nz, 1024, bias=False)
