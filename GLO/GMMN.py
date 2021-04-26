@@ -1,47 +1,48 @@
-import os
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from IMLE import _netT
+from models import weights_init
 import numpy as np
 from losses.mmd_loss import MMD
 
 
 class GMMN():
-    def __init__(self, e_dim, z_dim, device):
+    def __init__(self, mapping, lr, batch_size, device):
         self.device = device
-        self.e_dim = e_dim
-        self.z_dim = z_dim
-        self.netT = _netT(e_dim, z_dim).train().to(device)
+        self.mapping = mapping.to(device)
+        self.mapping.apply(weights_init)
         self.loss = MMD()
-        self.name = f"GMMN-sampler"
-
-    def train(self, Zs, train_dir, lr=0.0001, batch_size=1024, epochs=50):
+        self.optimizer = torch.optim.Adam(self.mapping.parameters(), lr=lr, betas=(0.5, 0.999), weight_decay=1e-5)
         self.batch_size = batch_size
-        self.optimizer = torch.optim.Adam(self.netT.parameters(), lr=lr, betas=(0.5, 0.999), weight_decay=1e-5)
-        losses = []
+        self.name = f"GMMN-mapping"
+
+    def train(self, Zs, train_dir, epochs=50):
         pbar = tqdm(range(epochs))
-        for epoch in range(epochs):
-            loss = self.train_epoch(Zs, epoch)
+        losses = []
+        for epoch in pbar:
+            loss = self.train_epoch(Zs)
             pbar.set_description("GMMN: Epoch: %d loss: %f" % (epoch, loss))
             losses.append(loss)
-        torch.save(self.netT.state_dict(), f"{train_dir}/netT-MMD.pth")
+            if (epoch + 1) % 5 == 0:
+                for g in self.optimizer.param_groups:
+                    g['lr'] *= 0.85
         plt.plot(range(len(losses)), losses)
-        plt.savefig(f"{train_dir}/imgs/GMMN-train-loss.png")
+        plt.savefig(f"{train_dir}/GMMN-train-loss.png")
+        plt.clf()
 
-    def train_epoch(self, Zs, epoch):
+    def train_epoch(self, Zs):
         # Compute batch size
-        batch_size = self.batch_size
         n, d = Zs.shape
-        num_batchs = n // batch_size
+        num_batchs = n // self.batch_size
         shuffled_Zs = Zs[np.random.permutation(n)]
 
         loss = 0
         for b in range(num_batchs):
-            data_batch = shuffled_Zs[b * batch_size: (b + 1) * batch_size]
-            noise_batch = torch.from_numpy(np.random.uniform(low=-1.0, high=1.0, size=(batch_size, self.e_dim))).to(self.device).float()
-            fake_batch = self.netT(noise_batch)
+            data_batch = shuffled_Zs[b * self.batch_size: (b + 1) * self.batch_size]
+            noise_batch = torch.FloatTensor(self.batch_size, self.mapping.input_dim).uniform_(-1.0, 1.0).to(self.device)
+            # noise_batch = torch.randn(self.batch_size, self.mapping.input_dim).to(self.device)
+            fake_batch = self.mapping(noise_batch)
 
             loss = self.loss(fake_batch, data_batch)
 
@@ -50,7 +51,4 @@ class GMMN():
             self.optimizer.step()
             loss += loss.item()
 
-        return loss / batch_size
-
-    def load_weights(self, ckp_dir, device):
-        self.netT.load_state_dict(torch.load(os.path.join(ckp_dir, 'netT-MMD.pth'), map_location=device))
+        return loss / self.batch_size

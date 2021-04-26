@@ -4,7 +4,6 @@ import torch
 from torch.utils.data import Dataset
 import cv2
 
-from config import mnist_configs, faces_config
 
 def sample_gaussian(x, m, mu=None, cov=None):
     if mu is None:
@@ -19,11 +18,12 @@ def get_mu_sigma(x):
     return mu, cov
 
 
-def sample_mv(m, mu, cov):
+def sample_mv(m, mu, cov, restrict_to_unit_ball=False):
     z = np.random.multivariate_normal(mu, cov, size=m)
     z_t = torch.from_numpy(z).float()
-    radius = z_t.norm(2, 1).unsqueeze(1).expand_as(z_t)
-    z_t = z_t / radius
+    if restrict_to_unit_ball:
+        radius = z_t.norm(2, 1).unsqueeze(1).expand_as(z_t)
+        z_t = z_t / radius
     return z_t
 
 
@@ -104,13 +104,9 @@ def download_ffhq_thumbnails(data_dir):
     print("Done.")
 
 
-def get_dataloaders(dataset_name, device):
+def get_dataset(dataset_name, split='train'):
     if dataset_name == "mnist":
-        train_dataset = MnistDataset("../../../data/Mnist/train_Mnist.npy")
-        test_dataset = MnistDataset("../../../data/Mnist/test_Mnist.npy")
-        conf = mnist_configs
-        train_dataloader = get_dataloader(train_dataset, conf.batch_size, device)
-        test_dataloader = get_dataloader(test_dataset, conf.batch_size, device)
+        dataset = MnistDataset(f"../../../data/Mnist/{split}_Mnist.npy")
 
     elif dataset_name in ['celeba', 'ffhq']:
         if dataset_name == 'celeba':
@@ -125,13 +121,12 @@ def get_dataloaders(dataset_name, device):
         img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
         # np.random.shuffle(img_paths)  # Avoid mixing the test and train for test consistency
         val_size = int(0.15 * len(img_paths))
-        train_dataset = dataset_type(img_paths[val_size:])
-        test_dataset = dataset_type(img_paths[:val_size])
+        if split == "train":
+            dataset = dataset_type(img_paths[val_size:])
+        else:
+            dataset = dataset_type(img_paths[:val_size])
 
-        conf = faces_config
-        train_dataloader = get_dataloader(train_dataset, conf.batch_size, device)
-        test_dataloader = get_dataloader(test_dataset, conf.batch_size, device)
     else:
         raise ValueError("No such dataset")
 
-    return train_dataloader, test_dataloader, conf
+    return dataset

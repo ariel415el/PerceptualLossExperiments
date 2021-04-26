@@ -1,7 +1,6 @@
 import numpy as np
-import torch.nn as nn
 import torch.nn.init as init
-import torch.nn.functional as F
+from torch import nn as nn
 
 
 def weights_init(m):
@@ -12,24 +11,6 @@ def weights_init(m):
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
     elif classname.find('Linear') != -1:
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
-    elif classname.find('Emb') != -1:
-        init.normal_(m.weight, mean=0, std=0.01)
-
-
-class LatentCodesDict(nn.Module):
-    def __init__(self, nz, n):
-        super(LatentCodesDict, self).__init__()
-        self.n = n
-        self.emb = nn.Embedding(self.n, nz)
-        self.nz = nz
-
-    def get_norm(self):
-        wn = self.emb.weight.norm(2, 1).data.unsqueeze(1)
-        self.emb.weight.data = self.emb.weight.data.div(wn.expand_as(self.emb.weight.data))
-
-    def forward(self, idx):
-        z = self.emb(idx).squeeze()
-        return z
 
 
 class InfoGanGenerator(nn.Module):
@@ -155,3 +136,25 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
 
+
+class LatentMapper(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(LatentMapper, self).__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.lin1 = nn.Linear(input_dim, 128, bias=False)
+        self.bn1 = nn.BatchNorm1d(128)
+        self.lin2 = nn.Linear(128, 128, bias=False)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.lin_out = nn.Linear(128, output_dim, bias=False)
+        self.relu = nn.ReLU(True)
+
+    def forward(self, z):
+        z = self.lin1(z)
+        z = self.bn1(z)
+        z = self.relu(z)
+        z = self.lin2(z)
+        z = self.bn2(z)
+        z = self.relu(z)
+        z = self.lin_out(z)
+        return z

@@ -30,25 +30,21 @@ class VGGFeatures(nn.Module):
                 in_channels = v
         self.features = nn.Sequential(*features)
 
+        self.pretrained = pretrained
         if pretrained:
             weigths = torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16_head.pth"))
             self.load_state_dict(weigths)
             self.name += "_PT"
-            # weigths = {k:v for k,v in weigths.items() if k in ['features.0.weight', 'features.0.bias']}
-            # model_dict = self.state_dict()
-            # model_dict.update(weigths)
-            # self.load_state_dict(model_dict)
-            # self.name += "_PT_only-first_layer"
-        else:
-            # self.name += "all-random"
-            i = 0
-            for feat in self.features:
-                if type(feat) == torch.nn.Conv2d:
-                    torch.nn.init.kaiming_normal_(feat.weight)
-                    if i == 0:
-                        i += 1
-                        feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
-                    torch.nn.init.constant_(feat.bias, 0.)
+
+    def _initialize_weights_randomly(self):
+        i = 0
+        for feat in self.features:
+            if type(feat) == torch.nn.Conv2d:
+                torch.nn.init.kaiming_normal_(feat.weight)
+                # if i == 0:
+                #     i += 1
+                #     feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
+                torch.nn.init.constant_(feat.bias, 0.)
 
     def get_activations(self, z, normalize=False):
         if normalize:
@@ -62,6 +58,8 @@ class VGGFeatures(nn.Module):
         return activations
 
     def forward(self, I1, I2):
+        if not self.pretrained:
+            self._initialize_weights_randomly()
         batch_size = I1.size(0)
         if I1.size(1) == 1:
           I1 = I1.expand((I1.size(0), 3, I1.size(2), I1.size(3)))
