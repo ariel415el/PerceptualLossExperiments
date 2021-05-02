@@ -41,9 +41,9 @@ class VGGFeatures(nn.Module):
         for feat in self.features:
             if type(feat) == torch.nn.Conv2d:
                 torch.nn.init.kaiming_normal_(feat.weight)
-                # if i == 0:
-                #     i += 1
-                #     feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
+                if i == 0:
+                    i += 1
+                    feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
                 torch.nn.init.constant_(feat.bias, 0.)
 
     def get_activations(self, z, normalize=False):

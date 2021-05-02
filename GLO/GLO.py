@@ -38,7 +38,7 @@ class GLOTrainer:
         self.name = f"GLO{'-FN' if glo_params.force_norm else ''}" \
                     f"(LR-{glo_params.lr}/{glo_params.decay_rate}/{glo_params.decay_epochs}_BS-{glo_params.batch_size})"
 
-    def train(self, outptus_dir, vis_epochs=1):
+    def train(self, outptus_dir, vis_epochs=10):
         os.makedirs(outptus_dir, exist_ok=True)
 
         errs = []
@@ -53,6 +53,8 @@ class GLOTrainer:
                 plt.ylabel(f"loss ({er:.2f})")
                 plt.savefig(os.path.join(outptus_dir, "train_loss.png"))
                 plt.clf()
+                torch.save(self.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
+                torch.save(self.generator.state_dict(), f"{outptus_dir}/generator.pth")
             if (epoch + 1) % self.glo_params.decay_epochs == 0:
                 for g,z in zip(self.optimizerG.param_groups, self.optimizerZ.param_groups):
                     g['lr'] *= self.glo_params.decay_rate
@@ -68,25 +70,26 @@ class GLOTrainer:
             indices = indices.long().to(self.device)
             images = images.float().to(self.device)
 
-            # Forward pass
-            self.latent_codes.zero_grad()
-            self.generator.zero_grad()
-            zi = self.latent_codes(indices)
-            fake_images = self.generator(zi)
+            for i in range(self.glo_params.num_opt_steps):
+                # Forward pass
+                self.latent_codes.zero_grad()
+                self.generator.zero_grad()
+                zi = self.latent_codes(indices)
+                fake_images = self.generator(zi)
 
-            rec_loss = self.criterion(fake_images, images)
-            rec_loss = rec_loss.mean()
+                rec_loss = self.criterion(fake_images, images)
+                rec_loss = rec_loss.mean()
 
-            # Backward pass and optimization step
-            rec_loss.backward()
-            self.optimizerG.step()
-            self.optimizerZ.step()
+                # Backward pass and optimization step
+                rec_loss.backward()
+                self.optimizerG.step()
+                self.optimizerZ.step()
 
-            er += rec_loss.item()
-            pbar.set_description(f"im/sec: {i * self.glo_params.batch_size / (time() - start):.2f}")
+                er += rec_loss.item()
+                pbar.set_description(f"im/sec: {i * self.glo_params.batch_size / (time() - start):.2f}")
         if self.glo_params.force_norm:
             self.latent_codes.force_norm()
-        er = er / (i + 1)
+        er = er / (i + 1) / self.glo_params.num_opt_steps
         return er
 
     def _visualize(self, epoch, dataset, outptus_dir):
