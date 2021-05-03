@@ -27,6 +27,9 @@ class GLOTrainer:
         self.latent_codes = LatentCodesDict(self.glo_params.z_dim, len(self.dataloader.dataset)).to(device)
         self.latent_codes.apply(weights_init)
 
+        # self.latent_codes.load_state_dict(torch.load('/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/batch_3/ffhq-l2+mmd+patch/latent_codes.pth', map_location=device))
+        # self.generator.load_state_dict(torch.load('/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/batch_3/ffhq-l2+mmd+patch/generator.pth', map_location=device))
+
         # Define optimizers
         self.optimizerG = optim.Adam(self.generator.parameters(),
                                      lr=self.glo_params.lr * self.glo_params.generator_lr_factor,
@@ -38,7 +41,7 @@ class GLOTrainer:
         self.name = f"GLO{'-FN' if glo_params.force_norm else ''}" \
                     f"(LR-{glo_params.lr}/{glo_params.decay_rate}/{glo_params.decay_epochs}_BS-{glo_params.batch_size})"
 
-    def train(self, outptus_dir, vis_epochs=10):
+    def train(self, outptus_dir, vis_epochs=1):
         os.makedirs(outptus_dir, exist_ok=True)
 
         errs = []
@@ -63,14 +66,14 @@ class GLOTrainer:
     def _train_epoch(self, dataloader):
         # Start optimizing
         er = 0
-        pbar = tqdm(enumerate(dataloader))
+        pbar = tqdm(enumerate(dataloader), total=len(dataloader.dataset) // dataloader.batch_size)
         start = time()
         for i, (indices, images) in pbar:
             # Put numpy data into tensors
             indices = indices.long().to(self.device)
             images = images.float().to(self.device)
 
-            for i in range(self.glo_params.num_opt_steps):
+            for j in range(self.glo_params.num_opt_steps):
                 # Forward pass
                 self.latent_codes.zero_grad()
                 self.generator.zero_grad()
@@ -86,7 +89,7 @@ class GLOTrainer:
                 self.optimizerZ.step()
 
                 er += rec_loss.item()
-                pbar.set_description(f"im/sec: {i * self.glo_params.batch_size / (time() - start):.2f}")
+            pbar.set_description(f"im/sec: {(i+1) * self.glo_params.batch_size * self.glo_params.num_opt_steps / (time() - start):.2f}")
         if self.glo_params.force_norm:
             self.latent_codes.force_norm()
         er = er / (i + 1) / self.glo_params.num_opt_steps

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import cv2
-
+import torch.utils.data.sampler
 
 def sample_gaussian(x, m, mu=None, cov=None):
     if mu is None:
@@ -80,6 +80,16 @@ class MemoryDataset(Dataset):
 
     def __getitem__(self, idx):
         return idx, self.images[idx]
+
+
+# class dataset_sampler(torch.utils.data.sampler.Sampler[int]):
+#     def __init__(self, n, batch_size):
+#         self.scores = np.full(n, np.inf)
+#         self.indices = np.full(n, np.inf)
+#
+#     def sample(self):
+#         self.scores = np.sort(self.scores)
+#         return self.
 
 
 class MnistDataset(Dataset):

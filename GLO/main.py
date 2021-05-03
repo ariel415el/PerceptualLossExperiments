@@ -6,6 +6,8 @@ import torch.utils.data
 import torchvision.utils as vutils
 
 from config import faces_config
+import sys
+sys.path.append(os.path.realpath(".."))
 from losses.patch_loss import PatchRBFLoss
 from losses.l2 import L2
 from losses.patch_mmd_loss import MMDApproximate
@@ -35,8 +37,8 @@ def train_GLO(dataset_name, train_dir):
     # Define the loss criterion
     criterion = ListOfLosses(
         [
-            # L2(),
-            VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True),
+            L2(),
+            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
             # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
@@ -51,9 +53,9 @@ def train_GLO(dataset_name, train_dir):
     glo_trainer = GLOTrainer(glo_params, generator, criterion, train_dataset, device)
     glo_trainer.train(outptus_dir)
 
-    # Save trained model and data embedding
-    torch.save(glo_trainer.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
-    torch.save(generator.state_dict(), f"{outptus_dir}/generator.pth")
+    # # Save trained model and data embedding
+    # torch.save(glo_trainer.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
+    # torch.save(generator.state_dict(), f"{outptus_dir}/generator.pth")
 
 
 def train_latent_samplers(train_dir):
@@ -83,19 +85,19 @@ def test_models(train_dir):
     imle_mapping.load_state_dict(torch.load(os.path.join(train_dir, 'IMLE-Mapping.pth'), map_location=device))
     gmmn_mapping.load_state_dict(torch.load(os.path.join(train_dir, 'GMMN-Mapping.pth'), map_location=device))
 
-    generator.eval()
-    imle_mapping.eval()
-    gmmn_mapping.eval()
+    # generator.eval()
+    # imle_mapping.eval()
+    # gmmn_mapping.eval()
 
     # plot reconstructions
-    latent_codes = data_embeddings[torch.randint(data_embeddings.shape[0], (64,))]
+    latent_codes = data_embeddings[torch.arange(64)]
     vutils.save_image(generator(latent_codes).cpu(), f"{train_dir}/imgs/Reconstructions.png", normalize=True)
 
     samplers = [NormalSampler(data_embeddings, device),
                 MappingSampler(imle_mapping, "IMLE", "normal", device),
                 MappingSampler(gmmn_mapping, "GMMN", "uniform", device)]
 
-    train_dataset = get_dataset('ffhq', split='train')
+    # train_dataset = get_dataset('ffhq', split='train')
     test_dataset = get_dataset('ffhq', split='test')
 
     for sampler in samplers:
@@ -106,7 +108,8 @@ def test_models(train_dir):
         plot_interpolations(generator, sampler, data_embeddings, train_dir, z_interpolation=False)
         plot_interpolations(generator, sampler, data_embeddings, train_dir, z_interpolation=True)
 
-    run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device)
+    # run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device)
+
 
 def plot_GLO_variance():
     os.makedirs('tmps', exist_ok=True)
@@ -124,9 +127,10 @@ def plot_GLO_variance():
             imgs = generator(noise)
             vutils.save_image((imgs+1)/2, f"tmps/{name}_{sigma}-{imgs.min():.3f}_{imgs.max():.3f}.png",normalize=False)
 
+
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_dir = 'outputs/many-iteration-per-batch/vgg-random-3steps'
+    train_dir = 'outputs/batch_3-spinoffs/l2-50-epochs'
     train_GLO('ffhq', train_dir)
-    train_latent_samplers(train_dir)
-    test_models(train_dir)
+    # train_latent_samplers(train_dir)
+    # test_models(train_dir)
