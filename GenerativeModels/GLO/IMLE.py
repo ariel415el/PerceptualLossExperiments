@@ -6,7 +6,7 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import faiss
-from models import weights_init
+from GenerativeModels.models import weights_init
 from tqdm import tqdm
 
 

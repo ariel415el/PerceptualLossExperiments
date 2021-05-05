@@ -56,12 +56,14 @@ class InfoGanGenerator(nn.Module):
 
 
 class DCGANGenerator(nn.Module):
-    def __init__(self, latent_dim, channels, output_dim=28):
-        ngf = 64
+    def __init__(self, input_dim, channels, output_dim=28):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        ngf = 128
         super(DCGANGenerator, self).__init__()
         if output_dim == 28:
             self.network = nn.Sequential(
-                nn.ConvTranspose2d(latent_dim, ngf * 4, 4, 1, 0, bias=False),
+                nn.ConvTranspose2d(input_dim, ngf * 4, 4, 1, 0, bias=False),
                 nn.BatchNorm2d(ngf * 4),
                 nn.ReLU(True),
 
@@ -74,11 +76,13 @@ class DCGANGenerator(nn.Module):
                 nn.ReLU(True),
 
                 nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
-                nn.Tanh()
+                # nn.Tanh()
+                nn.Sigmoid()
+
             )
         elif output_dim == 64:
             self.network = nn.Sequential(
-                nn.ConvTranspose2d(latent_dim, ngf * 8, 4, 1, 0, bias=False),
+                nn.ConvTranspose2d(input_dim, ngf * 8, 4, 1, 0, bias=False),
                 nn.BatchNorm2d(ngf * 8),
                 nn.ReLU(True),
 
@@ -95,7 +99,9 @@ class DCGANGenerator(nn.Module):
                 nn.ReLU(True),
 
                 nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
-                nn.Tanh()
+                # nn.Tanh()
+                nn.Sigmoid()
+
             )
 
     def forward(self, input):

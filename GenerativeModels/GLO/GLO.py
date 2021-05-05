@@ -7,10 +7,12 @@ import torchvision.utils as vutils
 from torch import nn as nn
 from tqdm import tqdm
 from time import time
-from utils import data_utils
+
+import GenerativeModels.GLO.utils
+import GenerativeModels.utils.data_utils
 import os
 import matplotlib.pyplot as plt
-from models import weights_init
+from GenerativeModels.models import weights_init
 
 
 class GLOTrainer:
@@ -21,14 +23,14 @@ class GLOTrainer:
         self.generator.apply(weights_init)
         self.criterion = criterion.to(device)
 
-        self.dataloader = data_utils.get_dataloader(dataset, self.glo_params.batch_size, self.device)
+        self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.glo_params.batch_size, self.device)
 
         # Define the learnable input codes
         self.latent_codes = LatentCodesDict(self.glo_params.z_dim, len(self.dataloader.dataset)).to(device)
         self.latent_codes.apply(weights_init)
 
-        # self.latent_codes.load_state_dict(torch.load('/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/batch_3/ffhq-l2+mmd+patch/latent_codes.pth', map_location=device))
-        # self.generator.load_state_dict(torch.load('/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/batch_3/ffhq-l2+mmd+patch/generator.pth', map_location=device))
+        self.latent_codes.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2-50-epochs/latent_codes.pth', map_location=device))
+        self.generator.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2-50-epochs/generator.pth', map_location=device))
 
         # Define optimizers
         self.optimizerG = optim.Adam(self.generator.parameters(),
@@ -44,18 +46,23 @@ class GLOTrainer:
     def train(self, outptus_dir, vis_epochs=1):
         os.makedirs(outptus_dir, exist_ok=True)
 
-        errs = []
+        losses = []
+        latent_codes_norms = []
+        latent_codes_change = []
         for epoch in range(self.glo_params.num_epochs):
-            er = self._train_epoch(self.dataloader)
-            errs.append(er)
-            print("Epoch: %d Error: %f" % (epoch, er))
+            old_latent_codes = self.latent_codes.emb.weight.clone()
+
+            loss = self._train_epoch(self.dataloader)
+
+            losses.append(loss)
+            latent_codes_norms.append(torch.mean(torch.norm(self.latent_codes.emb.weight, dim=1)).item())
+            latent_codes_change.append(torch.mean(torch.norm(self.latent_codes.emb.weight - old_latent_codes, dim=1)).item())
+            print("Epoch: %d Error: %f" % (epoch, loss))
             if epoch % vis_epochs == 0:
                 self._visualize(epoch, self.dataloader.dataset, outptus_dir)
-                plt.plot(np.arange(len(errs)), errs)
-                plt.xlabel("Epoch")
-                plt.ylabel(f"loss ({er:.2f})")
-                plt.savefig(os.path.join(outptus_dir, "train_loss.png"))
-                plt.clf()
+                plot_epoch(losses, "Loss", outptus_dir)
+                plot_epoch(latent_codes_norms, "Latent codes norm", outptus_dir)
+                plot_epoch(latent_codes_change, "Latent codes norm of change", outptus_dir)
                 torch.save(self.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
                 torch.save(self.generator.state_dict(), f"{outptus_dir}/generator.pth")
             if (epoch + 1) % self.glo_params.decay_epochs == 0:
@@ -109,7 +116,7 @@ class GLOTrainer:
         vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=True)
 
         # Generated from sampled latent vectors
-        z = data_utils.sample_gaussian(self.latent_codes.emb.weight.clone().cpu(), self.num_debug_imgs).to(self.device)
+        z = GenerativeModels.GLO.utils.sample_gaussian(self.latent_codes.emb.weight.clone().cpu(), self.num_debug_imgs).to(self.device)
         Igauss = self.generator(z)
         vutils.save_image(Igauss.data, os.path.join(outptus_dir, 'imgs', 'generate_sampled',f"epoch_{epoch}.png"), normalize=True)
 
@@ -134,3 +141,12 @@ class LatentCodesDict(nn.Module):
     def forward(self, idx):
         z = self.emb(idx).squeeze()
         return z
+
+
+def plot_epoch(arr, y_name, outptus_dir):
+    plt.plot(np.arange(len(arr)), arr)
+    plt.xlabel("Epoch")
+    plt.ylabel(y_name)
+    plt.title(f"{y_name} per epoch. last: {arr[-1]:.2f}")
+    plt.savefig(os.path.join(outptus_dir, f"{y_name}.png"))
+    plt.clf()

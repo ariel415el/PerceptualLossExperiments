@@ -1,4 +1,4 @@
-/GLO/training_dir
+/GenerativeModels/GLO/training_dir
 *.idea*
 *__pycache*
 *pyc*
@@ -7,7 +7,8 @@
 /kmeans/pmo_output_dir
 /perceptual_mean_optimization/outputs
 
-/GLO/outputs
+/GenerativeModels/GLO/outputs
+/GenerativeModels/GMMN/outputs
 /style_transfer/network_outputs
 /style_transfer/optimize_output
 /style_transfer/imgs

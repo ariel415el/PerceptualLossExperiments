@@ -1,5 +1,4 @@
 import os
-import sys
 
 import torch
 import torch.utils.data
@@ -7,21 +6,18 @@ import torchvision.utils as vutils
 
 from config import faces_config
 import sys
-sys.path.append(os.path.realpath(".."))
+sys.path.append(os.path.realpath("../.."))
 from losses.patch_loss import PatchRBFLoss
 from losses.l2 import L2
 from losses.patch_mmd_loss import MMDApproximate
-from utils.test_utils import NormalSampler, MappingSampler, run_FID_tests, find_nearest_neighbor, plot_interpolations
-from utils.data_utils import get_dataset
-from GMMN import GMMN
-from IMLE import IMLE
+from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
+from GenerativeModels.utils.data_utils import get_dataset
+from GenerativeModels.GMMN.GMMN import GMMN
 from GLO import GLOTrainer
-import models
+from GenerativeModels import models
 
-sys.path.append(os.path.realpath(".."))
+sys.path.append(os.path.realpath("../.."))
 from losses.utils import ListOfLosses
-from losses.vgg_loss.vgg_loss import VGGFeatures
-
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -38,15 +34,15 @@ def train_GLO(dataset_name, train_dir):
     criterion = ListOfLosses(
         [
             L2(),
-            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True),
+            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=True, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
-            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
-            # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
+            MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
+            PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
             # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
             # self.dist = ScnnLoss()
         ]
-        # ,weights=[0.001, 0.05, 1.0]
+        ,weights=[0.001, 0.05, 1.0]
     )
 
     outptus_dir = train_dir
@@ -130,7 +126,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_dir = 'outputs/batch_3-spinoffs/l2-50-epochs'
+    train_dir = 'outputs/batch_3-spinoffs/l2-50-epochs->MMD'
     train_GLO('ffhq', train_dir)
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

@@ -1,30 +1,9 @@
 import os
+
+import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-import cv2
-import torch.utils.data.sampler
-
-def sample_gaussian(x, m, mu=None, cov=None):
-    if mu is None:
-        mu, cov = get_mu_sigma(x)
-    return sample_mv(m, mu, cov)
-
-
-def get_mu_sigma(x):
-    x = x.data.numpy()
-    mu = x.mean(0).squeeze()
-    cov = np.cov(x, rowvar=False)
-    return mu, cov
-
-
-def sample_mv(m, mu, cov, restrict_to_unit_ball=False):
-    z = np.random.multivariate_normal(mu, cov, size=m)
-    z_t = torch.from_numpy(z).float()
-    if restrict_to_unit_ball:
-        radius = z_t.norm(2, 1).unsqueeze(1).expand_as(z_t)
-        z_t = z_t / radius
-    return z_t
 
 
 def get_dataloader(dataset, batch_size, device):
@@ -82,16 +61,6 @@ class MemoryDataset(Dataset):
         return idx, self.images[idx]
 
 
-# class dataset_sampler(torch.utils.data.sampler.Sampler[int]):
-#     def __init__(self, n, batch_size):
-#         self.scores = np.full(n, np.inf)
-#         self.indices = np.full(n, np.inf)
-#
-#     def sample(self):
-#         self.scores = np.sort(self.scores)
-#         return self.
-
-
 class MnistDataset(Dataset):
     def __init__(self, mnist_file):
         self.imgs = np.load(mnist_file)
@@ -116,14 +85,14 @@ def download_ffhq_thumbnails(data_dir):
 
 def get_dataset(dataset_name, split='train'):
     if dataset_name == "mnist":
-        dataset = MnistDataset(f"../../../data/Mnist/{split}_Mnist.npy")
+        dataset = MnistDataset(f"../../../../data/Mnist/{split}_Mnist.npy")
 
     elif dataset_name in ['celeba', 'ffhq']:
         if dataset_name == 'celeba':
-            train_samples_path = "../../../data/img_align_celeba"
+            train_samples_path = "../../../../data/img_align_celeba"
             dataset_type = DiskDataset
         else:
-            train_samples_path = "../../../data/FFHQ/thumbnails128x128"
+            train_samples_path = "../../../../data/FFHQ/thumbnails128x128"
             if not os.path.exists(train_samples_path):
                 download_ffhq_thumbnails(os.path.dirname(train_samples_path))
             dataset_type = MemoryDataset
