@@ -59,7 +59,7 @@ class DCGANGenerator(nn.Module):
     def __init__(self, input_dim, channels, output_dim=28):
         self.input_dim = input_dim
         self.output_dim = output_dim
-        ngf = 128
+        ngf = 64
         super(DCGANGenerator, self).__init__()
         if output_dim == 28:
             self.network = nn.Sequential(
@@ -76,8 +76,8 @@ class DCGANGenerator(nn.Module):
                 nn.ReLU(True),
 
                 nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
-                # nn.Tanh()
-                nn.Sigmoid()
+                nn.Tanh()
+                # nn.Sigmoid()
 
             )
         elif output_dim == 64:
@@ -99,8 +99,8 @@ class DCGANGenerator(nn.Module):
                 nn.ReLU(True),
 
                 nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
-                # nn.Tanh()
-                nn.Sigmoid()
+                nn.Tanh()
+                # nn.Sigmoid()
 
             )
 

@@ -4,12 +4,17 @@ import torch
 import torch.utils.data
 import torchvision.utils as vutils
 
+from GenerativeModels.GLO.IMLE import IMLE
 from config import faces_config
 import sys
+
+
 sys.path.append(os.path.realpath("../.."))
 from losses.patch_loss import PatchRBFLoss
 from losses.l2 import L2
+from losses.lap1_loss import LapLoss
 from losses.patch_mmd_loss import MMDApproximate
+from losses.vgg_loss.vgg_loss import VGGFeatures
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
 from GenerativeModels.utils.data_utils import get_dataset
 from GenerativeModels.GMMN.GMMN import GMMN
@@ -34,15 +39,15 @@ def train_GLO(dataset_name, train_dir):
     criterion = ListOfLosses(
         [
             L2(),
-            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=True, post_relu=True),
+            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
-            MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
-            PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
+            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
+            # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
             # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
             # self.dist = ScnnLoss()
         ]
-        ,weights=[0.001, 0.05, 1.0]
+        # , weights=[0.001, 0.05, 1.0]
     )
 
     outptus_dir = train_dir
@@ -61,25 +66,25 @@ def train_latent_samplers(train_dir):
 
     mapping = models.LatentMapper(e_dim, z_dim).train()
     #
-    # imle = IMLE(mapping, lr=0.001, batch_size=128, device=device)
-    # imle.train(latent_codes.cpu().numpy(), train_dir=train_dir, epochs=30)
-    # torch.save(mapping.state_dict(), f"{train_dir}/IMLE-Mapping.pth")
+    imle = IMLE(mapping, lr=0.001, batch_size=128, device=device)
+    imle.train(latent_codes.cpu().numpy(), train_dir=train_dir, epochs=30)
+    torch.save(mapping.state_dict(), f"{train_dir}/IMLE-Mapping.pth")
 
-    gmmn = GMMN(mapping, lr=0.0001, batch_size=6000, device=device)
-    gmmn.train(latent_codes, train_dir=train_dir, epochs=100)
-    torch.save(mapping.state_dict(), f"{train_dir}/GMMN-Mapping.pth")
+    # gmmn = GMMN(mapping, lr=0.0001, batch_size=6000, device=device)
+    # gmmn.train(latent_codes, train_dir=train_dir, epochs=100)
+    # torch.save(mapping.state_dict(), f"{train_dir}/GMMN-Mapping.pth")
 
 
 def test_models(train_dir):
     glo_params = faces_config
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim).to(device)
     imle_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
-    gmmn_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
+    # gmmn_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
 
     data_embeddings = torch.load(os.path.join(train_dir, 'latent_codes.pth'), map_location=device)['emb.weight']
     generator.load_state_dict(torch.load(os.path.join(train_dir, 'generator.pth'), map_location=device))
     imle_mapping.load_state_dict(torch.load(os.path.join(train_dir, 'IMLE-Mapping.pth'), map_location=device))
-    gmmn_mapping.load_state_dict(torch.load(os.path.join(train_dir, 'GMMN-Mapping.pth'), map_location=device))
+    # gmmn_mapping.load_state_dict(torch.load(os.path.join(train_dir, 'GMMN-Mapping.pth'), map_location=device))
 
     # generator.eval()
     # imle_mapping.eval()
@@ -91,7 +96,8 @@ def test_models(train_dir):
 
     samplers = [NormalSampler(data_embeddings, device),
                 MappingSampler(imle_mapping, "IMLE", "normal", device),
-                MappingSampler(gmmn_mapping, "GMMN", "uniform", device)]
+                # MappingSampler(gmmn_mapping, "GMMN", "uniform", device)
+                ]
 
     # train_dataset = get_dataset('ffhq', split='train')
     test_dataset = get_dataset('ffhq', split='test')
@@ -126,7 +132,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_dir = 'outputs/batch_3-spinoffs/l2-50-epochs->MMD'
+    train_dir = 'outputs/gen1-z5/l2-5z-steps'
     train_GLO('ffhq', train_dir)
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

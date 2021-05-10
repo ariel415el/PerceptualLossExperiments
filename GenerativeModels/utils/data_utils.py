@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 def get_dataloader(dataset, batch_size, device):
     kwargs = {'batch_size': batch_size, 'shuffle': True, 'drop_last': True}
     if device == "cuda:0":
-        kwargs.update({'num_workers': 12,
+        kwargs.update({'num_workers': 8,
                        'pin_memory': True})
     return torch.utils.data.DataLoader(dataset, **kwargs)
 
@@ -60,7 +60,6 @@ class MemoryDataset(Dataset):
     def __getitem__(self, idx):
         return idx, self.images[idx]
 
-
 class MnistDataset(Dataset):
     def __init__(self, mnist_file):
         self.imgs = np.load(mnist_file)
@@ -73,6 +72,17 @@ class MnistDataset(Dataset):
     def __getitem__(self, idx):
         return idx, self.imgs[idx]
 
+class DspriteDatset(Dataset):
+    def __init__(self, dsprite_imgs_file):
+        self.imgs = np.load(dsprite_imgs_file)[:,None]
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        return idx, self.imgs[idx]
+
+
 
 def download_ffhq_thumbnails(data_dir):
     print("Downloadint FFHQ-thumbnails from kaggle...")
@@ -84,7 +94,10 @@ def download_ffhq_thumbnails(data_dir):
 
 
 def get_dataset(dataset_name, split='train'):
-    if dataset_name == "mnist":
+    if dataset_name == "dsprites":
+        dataset = DspriteDatset(f"../../../../data/dsprites/imgs.npy")
+
+    elif dataset_name == "mnist":
         dataset = MnistDataset(f"../../../../data/Mnist/{split}_Mnist.npy")
 
     elif dataset_name in ['celeba', 'ffhq']:

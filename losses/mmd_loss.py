@@ -54,5 +54,5 @@ class MMD(torch.nn.Module):
         N = target.size()[0]
         S = get_scale_matrix(M, N).to(output.device)
 
-        return dot_product_kernel(X, S)
-        # return multi_bandwitdh_rbf_kernel(X, S)
+        # return dot_product_kernel(X, S)
+        return multi_bandwitdh_rbf_kernel(X, S)

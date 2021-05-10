@@ -26,11 +26,11 @@ class GLOTrainer:
         self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.glo_params.batch_size, self.device)
 
         # Define the learnable input codes
-        self.latent_codes = LatentCodesDict(self.glo_params.z_dim, len(self.dataloader.dataset)).to(device)
+        self.latent_codes = LatentCodesDict(self.glo_params.z_dim, len(dataset)).to(device)
         self.latent_codes.apply(weights_init)
 
-        self.latent_codes.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2-50-epochs/latent_codes.pth', map_location=device))
-        self.generator.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2-50-epochs/generator.pth', map_location=device))
+        # self.latent_codes.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2_norm1-50-epochs/latent_codes.pth', map_location=device))
+        # self.generator.load_state_dict(torch.load('outputs/batch_3-spinoffs/l2_norm1-50-epochs/generator.pth', map_location=device))
 
         # Define optimizers
         self.optimizerG = optim.Adam(self.generator.parameters(),
@@ -38,92 +38,62 @@ class GLOTrainer:
                                      betas=(0.5, 0.999))
         self.optimizerZ = optim.Adam(self.latent_codes.parameters(), lr=self.glo_params.lr, betas=(0.5, 0.999))
 
-        self.num_debug_imgs = 64
-        self.fixed_noise = torch.FloatTensor(self.num_debug_imgs, glo_params.z_dim).normal_(0, 1).to(self.device)
         self.name = f"GLO{'-FN' if glo_params.force_norm else ''}" \
                     f"(LR-{glo_params.lr}/{glo_params.decay_rate}/{glo_params.decay_epochs}_BS-{glo_params.batch_size})"
 
-    def train(self, outptus_dir, vis_epochs=1):
-        os.makedirs(outptus_dir, exist_ok=True)
-
-        losses = []
-        latent_codes_norms = []
-        latent_codes_change = []
-        for epoch in range(self.glo_params.num_epochs):
-            old_latent_codes = self.latent_codes.emb.weight.clone()
-
-            loss = self._train_epoch(self.dataloader)
-
-            losses.append(loss)
-            latent_codes_norms.append(torch.mean(torch.norm(self.latent_codes.emb.weight, dim=1)).item())
-            latent_codes_change.append(torch.mean(torch.norm(self.latent_codes.emb.weight - old_latent_codes, dim=1)).item())
-            print("Epoch: %d Error: %f" % (epoch, loss))
-            if epoch % vis_epochs == 0:
-                self._visualize(epoch, self.dataloader.dataset, outptus_dir)
-                plot_epoch(losses, "Loss", outptus_dir)
-                plot_epoch(latent_codes_norms, "Latent codes norm", outptus_dir)
-                plot_epoch(latent_codes_change, "Latent codes norm of change", outptus_dir)
-                torch.save(self.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
-                torch.save(self.generator.state_dict(), f"{outptus_dir}/generator.pth")
-            if (epoch + 1) % self.glo_params.decay_epochs == 0:
-                for g,z in zip(self.optimizerG.param_groups, self.optimizerZ.param_groups):
-                    g['lr'] *= self.glo_params.decay_rate
-                    z['lr'] *= self.glo_params.decay_rate
-
-    def _train_epoch(self, dataloader):
-        # Start optimizing
-        er = 0
-        pbar = tqdm(enumerate(dataloader), total=len(dataloader.dataset) // dataloader.batch_size)
+    def train(self, outptus_dir, epochs=200, vis_freq=1):
         start = time()
-        for i, (indices, images) in pbar:
-            # Put numpy data into tensors
-            indices = indices.long().to(self.device)
-            images = images.float().to(self.device)
+        loss_means = []
+        losses = []
+        pbar = tqdm(total=epochs)
+        step = 0
+        for epoch in range(epochs):
+            for indices, images in self.dataloader:
+                step += 1
+                indices = indices.long().to(self.device)
+                images = images.float().to(self.device)
 
-            for j in range(self.glo_params.num_opt_steps):
-                # Forward pass
-                self.latent_codes.zero_grad()
-                self.generator.zero_grad()
                 zi = self.latent_codes(indices)
                 fake_images = self.generator(zi)
 
-                rec_loss = self.criterion(fake_images, images)
-                rec_loss = rec_loss.mean()
-
-                # Backward pass and optimization step
+                rec_loss = self.criterion(fake_images, images).mean()
                 rec_loss.backward()
-                self.optimizerG.step()
-                self.optimizerZ.step()
 
-                er += rec_loss.item()
-            pbar.set_description(f"im/sec: {(i+1) * self.glo_params.batch_size * self.glo_params.num_opt_steps / (time() - start):.2f}")
-        if self.glo_params.force_norm:
-            self.latent_codes.force_norm()
-        er = er / (i + 1) / self.glo_params.num_opt_steps
-        return er
+                losses.append(rec_loss.item())
+
+                self.optimizerZ.step()
+                self.latent_codes.zero_grad()
+                if step % self.glo_params.num_z_steps == 0:
+                    self.optimizerG.step()
+                    self.generator.zero_grad()
+
+            if epoch % vis_freq == 0:
+                self._visualize(epoch, self.dataloader.dataset, outptus_dir)
+                loss_means.append(np.mean(losses))
+                losses = []
+                plot_epoch(loss_means, "Loss", outptus_dir)
+                torch.save(self.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
+                torch.save(self.generator.state_dict(), f"{outptus_dir}/generator.pth")
+                pbar.set_description(f"Epoch: {epoch}: step {step}, im/sec: {(step + 1) * self.glo_params.batch_size / (time() - start):.2f}")
+
+            if (epoch + 1) % self.glo_params.decay_epochs == 0:
+                for g, z in zip(self.optimizerG.param_groups, self.optimizerZ.param_groups):
+                    z['lr'] *= self.glo_params.decay_rate
+                    g['lr'] *= self.glo_params.decay_rate
 
     def _visualize(self, epoch, dataset, outptus_dir):
-        debug_indices = np.arange(self.num_debug_imgs)
+        os.makedirs(outptus_dir, exist_ok=True)
+        debug_indices = np.arange(25)
         if epoch == 0:
-            os.makedirs(os.path.join(outptus_dir, "imgs", "generate_fixed"), exist_ok=True)
-            os.makedirs(os.path.join(outptus_dir, "imgs", "generate_sampled"), exist_ok=True)
             os.makedirs(os.path.join(outptus_dir, "imgs", "reconstructions"), exist_ok=True)
             # dumpy original images fro later reconstruction debug images
-            first_imgs = torch.from_numpy(np.array([dataset[x][1] for x in debug_indices]))
-            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'), normalize=True)
-        # fixed latent Generated images
-        Igen = self.generator(self.fixed_noise)
-        vutils.save_image(Igen.data, os.path.join(outptus_dir, 'imgs', 'generate_fixed',f"epoch_{epoch}.png"), normalize=True)
-
-        # Generated from sampled latent vectors
-        z = GenerativeModels.GLO.utils.sample_gaussian(self.latent_codes.emb.weight.clone().cpu(), self.num_debug_imgs).to(self.device)
-        Igauss = self.generator(z)
-        vutils.save_image(Igauss.data, os.path.join(outptus_dir, 'imgs', 'generate_sampled',f"epoch_{epoch}.png"), normalize=True)
+            first_imgs = torch.from_numpy(dataset[debug_indices][1])
+            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'), normalize=True, nrow=5)
 
         # Reconstructed images
         idx = torch.from_numpy(debug_indices).to(self.device)
         Irec = self.generator(self.latent_codes(idx))
-        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"epoch_{epoch}.png"), normalize=True)
+        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"step_{epoch}.png"), normalize=True, nrow=5)
 
 
 class LatentCodesDict(nn.Module):
@@ -142,6 +112,9 @@ class LatentCodesDict(nn.Module):
         z = self.emb(idx).squeeze()
         return z
 
+def endless_iterator(dataloader):
+    while True:
+        for x in iter(dataloader): yield x
 
 def plot_epoch(arr, y_name, outptus_dir):
     plt.plot(np.arange(len(arr)), arr)
