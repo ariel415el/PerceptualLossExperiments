@@ -33,16 +33,17 @@ def train_GLO(dataset_name, train_dir):
     glo_params = faces_config
 
     # define the generator
-    generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
+    # generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
+    generator = models.WAE_Decoder(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
 
     # Define the loss criterion
     criterion = ListOfLosses(
         [
             L2(),
-            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=False, post_relu=True),
+            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=True, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
-            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
+            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=8, pool_strides=4, normalize_patch='channel_mean', pad_image=True),
             # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
             # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
             # self.dist = ScnnLoss()
@@ -67,7 +68,7 @@ def train_latent_samplers(train_dir):
     mapping = models.LatentMapper(e_dim, z_dim).train()
     #
     imle = IMLE(mapping, lr=0.001, batch_size=128, device=device)
-    imle.train(latent_codes.cpu().numpy(), train_dir=train_dir, epochs=30)
+    imle.train(latent_codes.cpu().numpy(), train_dir=train_dir, epochs=20)
     torch.save(mapping.state_dict(), f"{train_dir}/IMLE-Mapping.pth")
 
     # gmmn = GMMN(mapping, lr=0.0001, batch_size=6000, device=device)
@@ -132,7 +133,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_dir = 'outputs/gen1-z5/l2-5z-steps'
+    train_dir = 'outputs/WAE-arch/l2'
     train_GLO('ffhq', train_dir)
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

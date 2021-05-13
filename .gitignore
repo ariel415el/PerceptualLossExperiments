@@ -9,6 +9,7 @@
 
 /GenerativeModels/GLO/outputs
 /GenerativeModels/GMMN/outputs
+/GenerativeModels/Aotuencoders/outputs
 /style_transfer/network_outputs
 /style_transfer/optimize_output
 /style_transfer/imgs
