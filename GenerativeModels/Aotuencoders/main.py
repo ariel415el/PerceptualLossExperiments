@@ -27,21 +27,21 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train_autoencoder(dataset_name, train_dir):
-    train_dataset = get_dataset('ffhq', split='train')
     params = faces_config
+    train_dataset = get_dataset('ffhq', split='test', resize=params.img_dim)
 
     # define the generator
-    encoder = models.DCGANEncoder(params.z_dim, params.channels, params.img_dim)
+    encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim)
 
     # Define the loss criterion
     criterion = ListOfLosses(
         [
             # L2(),
-            VGGFeatures(5, pretrained=False, post_relu=True),
+            VGGFeatures(5, pretrained=True, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
-            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=8, pool_strides=4, normalize_patch='channel_mean', pad_image=True),
+            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
             # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
             # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
             # self.dist = ScnnLoss()
@@ -89,7 +89,9 @@ def evaluate_generator(outputs_dir):
     rec_imgs = generator(encoder(torch.from_numpy(test_dataset.images[:25]).to(device).float()))
     vutils.save_image(rec_imgs, os.path.join(outputs_dir, 'test-reconstructions.png'), normalize=True, nrow=5)
 
+
 if __name__ == '__main__':
-    train_dir = 'outputs/WAE-arch_full_data/VGG-random'
+    train_dir = 'outputs/ffhq_128/VGG-PT'
     train_autoencoder('ffhq', train_dir)
-    evaluate_generator(train_dir)
+    # evaluate_generator(train_dir)
+#

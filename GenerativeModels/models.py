@@ -70,8 +70,13 @@ class DCGANGenerator(nn.Module):
             kernel_dim = [4, 4, 4, 4, 4]
             strides = [1, 2, 2, 2, 2]
             padding = [0, 1, 1, 1, 1]
+        elif output_img_dim == 128:
+            layer_depths = [input_dim, 512, 512, 256, 128, 64]
+            kernel_dim = [4, 4, 4, 4, 4, 4]
+            strides = [1, 2, 2, 2, 2, 2]
+            padding = [0, 1, 1, 1, 1, 1]
         else:
-            raise ValueError("Image dim supports only 28,64")
+            raise ValueError("Image dim supports only 28, 64, 128")
         layers = []
         for i in range(len(layer_depths) - 1):
             layers += [
@@ -94,28 +99,27 @@ class DCGANGenerator(nn.Module):
 class DCGANEncoder(nn.Module):
     def __init__(self, input_img_dim, channels, output_latent_dim):
         super(DCGANEncoder, self).__init__()
-        # layer_depth = [128, 256, 512, 1024]
-        layer_depth = [64, 128, 256, 512]
-        # layer_depth = [32, 64, 128, 256]
-        self.convs = nn.Sequential(
-            nn.Conv2d(channels, layer_depth[0], 4, 2, 1, bias=False),  # B,  128, 32, 32
-            nn.BatchNorm2d(layer_depth[0]),
-            nn.ReLU(True),
-            nn.Conv2d(layer_depth[0], layer_depth[1], 4, 2, 1, bias=False),  # B,  256, 16, 16
-            nn.BatchNorm2d(layer_depth[1]),
-            nn.ReLU(True),
-            nn.Conv2d(layer_depth[1], layer_depth[2], 4, 2, 1, bias=False),  # B,  512,  8,  8
-            nn.BatchNorm2d(layer_depth[2]),
-            nn.ReLU(True),
-            nn.Conv2d(layer_depth[2], layer_depth[3], 4, 2, 1, bias=False),  # B, 1024,  4,  4
-            nn.BatchNorm2d(layer_depth[3]),
-            nn.ReLU(True),
-            nn.Conv2d(layer_depth[3], output_latent_dim, 4, 1, 0, bias=False),  # B, 1024,  4,  4
-        )
+        if input_img_dim == 64:
+            layer_depth = [channels, 64, 128, 256, 512]
+        elif input_img_dim == 128:
+            layer_depth = [channels, 64, 128, 256, 512, 512]
+        else:
+            raise ValueError("Image dim supports only 28, 64, 128")
+        layers = []
+        for i in range(len(layer_depth)-1):
+            layers += [
+                nn.Conv2d(layer_depth[i], layer_depth[i+1], 4, 2, 1, bias=False),
+                nn.BatchNorm2d(layer_depth[i+1]),
+                nn.ReLU(True)
+                ]
+        layers.append(nn.Conv2d(layer_depth[-1], output_latent_dim, 4, 1, 0, bias=False))
+        self.convs = nn.Sequential(*layers)
+
+
     def forward(self, input):
-        input = input
-        output = self.convs(input).view(input.size(0), -1)
-        return output
+            input = input
+            output = self.convs(input).view(input.size(0), -1)
+            return output
 
 
 class LatentMapper(nn.Module):
@@ -181,12 +185,12 @@ if __name__ == '__main__':
     input = torch.randn(64).unsqueeze(0)
     input.requires_grad_(True)
 
-    model = DCGANGenerator(64,3,64)
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-    model = DCGANEncoder(64,3,64)
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    decoder = DCGANGenerator(64, 3, 128)
+    print(sum(p.numel() for p in decoder.parameters() if p.requires_grad))
+    encoder = DCGANEncoder(128, 3, 64)
+    print(sum(p.numel() for p in encoder.parameters() if p.requires_grad))
 
-    optimizer = torch.optim.SGD(list(model.parameters()) + [input], lr=0.01)
+    optimizer = torch.optim.SGD(list(decoder.parameters()) + [input], lr=0.01)
     # optimizer = torch.optim.Adam(list(model.parameters()), lr=0.1)
 
     for i in range(10000):
@@ -195,7 +199,7 @@ if __name__ == '__main__':
                 g['lr'] *= 0.8
             print(i, loss.item())
             vutils.save_image(output[0], 'generated.png',normalize=True)
-        output = model(input)
+        output = decoder(input)
         loss = torch.nn.MSELoss()(output, target)
         loss.backward()
         optimizer.step()

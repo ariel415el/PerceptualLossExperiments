@@ -15,9 +15,10 @@ def get_dataloader(dataset, batch_size, device):
 
 
 class DiskDataset(Dataset):
-    def __init__(self, paths, crop=False):
+    def __init__(self, paths, resize=64, crop=False):
         self.image_paths = paths
         self.crop = crop
+        self.resize = resize
 
     def __len__(self):
         return len(self.image_paths)
@@ -27,7 +28,7 @@ class DiskDataset(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         if self.crop:
             img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
-        img = cv2.resize(img, (64, 64)) / 255.0
+        img = cv2.resize(img, (self.resize, self.resize)) / 255.0
         img = img.transpose((2, 0, 1))
 
         img = 2 * img - 1  # transform to -1 1
@@ -36,7 +37,7 @@ class DiskDataset(Dataset):
 
 
 class MemoryDataset(Dataset):
-    def __init__(self, paths, crop=False):
+    def __init__(self, paths, resize=64, crop=False):
         self.images = []
         self.crop = crop
         print("Loading data into memory")
@@ -45,7 +46,7 @@ class MemoryDataset(Dataset):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             if self.crop:
                 img = img[109 - 90:109 + 80, 89 - 85:89 + 85] # CelebA
-            img = cv2.resize(img, (64, 64)) / 255.0
+            img = cv2.resize(img, (resize, resize)) / 255.0
             img = 2 * img - 1  # transform to -1 1
 
             img = img.transpose((2, 0, 1))
@@ -93,7 +94,8 @@ def download_ffhq_thumbnails(data_dir):
     print("Done.")
 
 
-def get_dataset(dataset_name, split='train'):
+def get_dataset(dataset_name, resize, split='train'):
+    kwargs = dict()
     if dataset_name == "dsprites":
         dataset = DspriteDatset(f"../../../../data/dsprites/imgs.npy")
 
@@ -108,15 +110,16 @@ def get_dataset(dataset_name, split='train'):
             train_samples_path = "../../../../data/FFHQ/thumbnails128x128"
             if not os.path.exists(train_samples_path):
                 download_ffhq_thumbnails(os.path.dirname(train_samples_path))
+            kwargs['resize'] = resize
             dataset_type = MemoryDataset
 
         img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
         # np.random.shuffle(img_paths)  # Avoid mixing the test and train for test consistency
         val_size = int(0.15 * len(img_paths))
         if split == "train":
-            dataset = dataset_type(img_paths[val_size:])
+            dataset = dataset_type(img_paths[val_size:], **kwargs)
         else:
-            dataset = dataset_type(img_paths[:val_size])
+            dataset = dataset_type(img_paths[:val_size], **kwargs)
 
     else:
         raise ValueError("No such dataset")
