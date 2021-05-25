@@ -4,7 +4,7 @@ class config:
         pass
 
 faces_config = config()
-faces_config.img_dim = 128
+faces_config.img_dim = 64
 faces_config.channels = 3
 faces_config.z_dim = 64
 faces_config.e_dim = 64

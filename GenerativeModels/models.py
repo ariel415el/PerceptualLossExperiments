@@ -13,59 +13,12 @@ def weights_init(m):
         init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
 
 
-class InfoGanGenerator(nn.Module):
-    def __init__(self, nz, sz, nc, do_bn=False):
-        super(InfoGanGenerator, self).__init__()
-        self.sz = sz
-        self.dim_im = 128 * (sz // 4) * (sz // 4)
-        self.lin_in = nn.Linear(nz, 1024, bias=False)
-        self.bn_in = nn.BatchNorm1d(1024)
-        self.lin_im = nn.Linear(1024, self.dim_im, bias=False)
-        self.bn_im = nn.BatchNorm1d(self.dim_im)
-
-        self.conv1 = nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=True)
-        self.bn_conv = nn.BatchNorm2d(64)
-        self.conv2 = nn.ConvTranspose2d(64, nc, 4, 2, 1, bias=True)
-        # self.output_nl = nn.Sigmoid()  # to [0,1]
-        self.output_nl = nn.Tanh()  # tp [-1,1]
-        self.do_bn = do_bn
-        # self.nonlin = nn.SELU(True)
-        self.nonlin = nn.LeakyReLU(0.2, inplace=True)
-
-    def main(self, z):
-        z = self.lin_in(z)
-        z = self.nonlin(z)
-        z = self.lin_im(z)
-        if self.do_bn:
-            z = self.bn_im(z)
-        z = self.nonlin(z)
-        z = z.view(-1, 128, self. sz // 4, self.sz // 4)
-        z = self.conv1(z)
-        if self.do_bn:
-            z = self.bn_conv(z)
-        z = self.nonlin(z)
-        z = self.conv2(z)
-        z = self.output_nl(z)
-        return z
-
-    def forward(self, z):
-        zn = z.norm(2, 1).detach().unsqueeze(1).expand_as(z)
-        z = z.div(zn)
-        output = self.main(z)
-        return output
-
-
 class DCGANGenerator(nn.Module):
     def __init__(self, input_dim, channels, output_img_dim=28):
         self.input_dim = input_dim
         self.output_img_dim = output_img_dim
         super(DCGANGenerator, self).__init__()
-        if output_img_dim == 28:
-            layer_depths = [input_dim, 256, 128, 64]
-            kernel_dim = [4, 3, 2, 2]
-            strides = [1, 2, 2, 2]
-            padding = [0, 1, 1, 1]
-        elif output_img_dim == 64:
+        if output_img_dim == 64:
             layer_depths = [input_dim, 512, 256, 128, 64]
             kernel_dim = [4, 4, 4, 4, 4]
             strides = [1, 2, 2, 2, 2]
@@ -144,29 +97,6 @@ class LatentMapper(nn.Module):
         z = self.lin_out(z)
         return z
 
-
-class WAE_Decoder(nn.Module):
-    def __init__(self, input_latent_dim, channels, output_img_dim):
-        assert output_img_dim == 64, "WAE supports 64x64 imgaes only"
-        super(WAE_Decoder, self).__init__()
-        self.linear = nn.Linear(input_latent_dim, 1024*8*8)       # B, 1024*8*8
-        self.network = nn.Sequential(                             # B, 1024,  8,  8
-            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),   # B,  512, 16, 16
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),    # B,  256, 32, 32
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),    # B,  128, 64, 64
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(128, channels, 1),                 # B,   nc, 64, 64
-        )
-
-    def forward(self, input):
-        output = self.linear(input).view(-1, 1024, 8, 8)
-        output = self.network(output)
-        return output
 
 
 if __name__ == '__main__':

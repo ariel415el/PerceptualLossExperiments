@@ -28,7 +28,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train_autoencoder(dataset_name, train_dir):
     params = faces_config
-    train_dataset = get_dataset('ffhq', split='test', resize=params.img_dim)
+    train_dataset = get_dataset('ffhq', split='train', resize=params.img_dim)
 
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
@@ -37,20 +37,22 @@ def train_autoencoder(dataset_name, train_dir):
     # Define the loss criterion
     criterion = ListOfLosses(
         [
-            # L2(),
-            VGGFeatures(5, pretrained=True, post_relu=True),
+            L2(),
+            # VGGFeatures(5, pretrained=False, post_relu=True),
             # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
             # MMD()
-            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean', pad_image=True),
-            # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
+            PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device),
+            MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=512, pool_size=32, pool_strides=16,
+                           normalize_patch='channel_mean', pad_image=True),
             # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
             # self.dist = ScnnLoss()
         ]
-        # , weights=[0.001, 0.05, 1.0]
+        , weights=[0.001, 0.05, 1.0]
     )
 
     outptus_dir = train_dir
     trainer = AutoEncoderTraniner(faces_config, encoder, generator, criterion, train_dataset, device)
+    # trainer._load_ckpt(outptus_dir)
     trainer.train(outptus_dir, epochs=200)
 
 
@@ -91,7 +93,7 @@ def evaluate_generator(outputs_dir):
 
 
 if __name__ == '__main__':
-    train_dir = 'outputs/ffhq_128/VGG-PT'
+    train_dir = 'outputs/ffhq_128/MMD++(win=32,rf=512)'
     train_autoencoder('ffhq', train_dir)
     # evaluate_generator(train_dir)
 #

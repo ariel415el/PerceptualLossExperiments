@@ -7,8 +7,11 @@ from tqdm import tqdm
 
 import sys
 sys.path.append(os.path.realpath(".."))
-from losses.mmd_loss import MMDApproximate
+from losses.patch_mmd_loss import MMDApproximate
+from losses.patch_loss import PatchRBFLaplacianLoss, PatchRBFLoss
 from losses.l2 import L2
+from losses.mmd_loss import MMD
+from losses.lap1_loss import LapLoss
 from losses.utils import ListOfLosses
 from losses.vgg_loss.vgg_loss import VGGFeatures
 
@@ -54,7 +57,6 @@ def optimize_for_mean(images, criteria, output_dir, batch_size=1, num_steps=400,
     """
     :param images: tensor of shape (N, C, H, W)
     """
-    N = images.shape[0]
     os.makedirs(output_dir, exist_ok=True)
     images = images.to(device)
     criteria = criteria.to(device)
@@ -63,58 +65,92 @@ def optimize_for_mean(images, criteria, output_dir, batch_size=1, num_steps=400,
     # optimized_variable *= 0
     # optimized_variable = torch.randn(optimized_variable.shape).to(device).clamp(-1,1)
     optimized_variable.requires_grad_(True)
-
+    # optim = torch.optim.SGD([optimized_variable], lr=lr)
+    optim = torch.optim.Adam([optimized_variable], lr=lr)
     losses = []
+    for i in tqdm(range(num_steps+1)):
+        if i % 500 == 0:
+            optimized_image = optimized_variable.detach().cpu().numpy()[0]
+            optimized_image = pt2cv(optimized_image)
+            cv2.imwrite(f"{output_dir}/output-{i}.png", optimized_image)
 
-    for i in tqdm(range(num_steps + 1)):
-        optim = torch.optim.SGD([optimized_variable], lr=lr)
         optim.zero_grad()
-
-        for b in range(N // batch_size):
-            batch_images = images[b * batch_size: (b+1) * batch_size]
-            # batch_input = torch.tanh(optimized_variable.repeat(batch_size, 1, 1, 1))
-            batch_input = optimized_variable.repeat(batch_size, 1, 1, 1)
-            loss = criteria(batch_input, batch_images)
-            loss = loss.mean()
-            loss.backward()
-            optim.step()
+        batch_images = images[np.random.choice(range(len(images)), batch_size, replace=False)]
+        batch_input = optimized_variable.repeat(batch_size, 1, 1, 1)
+        loss = criteria(batch_input, batch_images)
+        loss = loss.mean()
+        loss.backward()
+        optim.step()
         losses.append(loss.item())
 
-        # if i % 25 == 0:
-        #     lr *= 0.9
         if i % 200 == 0:
+           for g in optim.param_groups:
+                g['lr'] *= 0.5
+        if i % 100 == 0:
             plt.title(f"last-Loss: {losses[-1]}")
             plt.plot(np.arange(len(losses)), losses)
             plt.savefig(f"{output_dir}/train_loss.png")
             plt.clf()
 
-            # optimized_image = torch.tanh(optimized_variable).detach().cpu().numpy()[0]
-            optimized_image = optimized_variable.detach().cpu().numpy()[0]
-            optimized_image = pt2cv(optimized_image)
-            cv2.imwrite(f"{output_dir}/output-{i}.png", optimized_image)
-
-    # optimized_image = torch.tanh(optimized_variable).detach().cpu().numpy()[0]
-    optimized_image = optimized_variable.detach().cpu().numpy()[0]
+    optimized_image = torch.clip(optimized_variable,-1,1).detach().cpu().numpy()[0]
+    # optimized_image = optimized_variable.detach().cpu().numpy()[0]
     optimized_image = pt2cv(optimized_image)
 
     return optimized_image
 
 
+def batch_run():
+    image_dirs = [
+                # 'clusters/00083_256/images',
+                'clusters/00068_256/images',
+                # 'clusters/00083_128/images',
+                # 'clusters/00068_128/images',
+                # 'clusters/00083_64/images',
+                # 'clusters/00068_64/images',
+                # 'clusters/stylegan_128/images',
+                # 'image_clusters/36126_s128_c_128/images',
+                # 'image_clusters/36126_s128_c_64/images',
+                # 'image_clusters/36126_s128_c_32/images',
+                # 'clusters/00068_128/images',
+                # 'vid_clusters/man_speech_128/images', 'vid_clusters/man_speech_256/images', 'vid_clusters/man_speech_64/images',
+                # 'vid_clusters/woman_speech_128/images', 'vid_clusters/woman_speech_256/images',  'vid_clusters/woman_speech_64/images'
+                  ]
+    losses = [
+        # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16,
+        #                normalize_patch='channel_mean', pad_image=True),
+        ListOfLosses([L2(),
+                      PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device),
+                      MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=8, pool_strides=4,
+                                     normalize_patch='channel_mean', pad_image=True)
+                      ],
+                     weights=[0.001, 0.05, 1.0], name="MMD++(win=8)"),
+        # ListOfLosses([L2(),
+        #               PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device),
+        #               MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=16, pool_strides=8,
+        #                              normalize_patch='channel_mean', pad_image=True)
+        #               ],
+        #              weights=[0.001, 0.05, 1.0], name="MMD++(win=16)"),
+        ListOfLosses([L2(),
+                      PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device),
+                      MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=32, pool_strides=16,
+                                     normalize_patch='channel_mean', pad_image=True)
+                      ],
+                     weights=[0.001, 0.05, 1.0], name="MMD++(win=32)"),
+        VGGFeatures(5, pretrained=True, post_relu=True),
+        VGGFeatures(5, pretrained=False, post_relu=True),
+    ]
+    root = 'batch_outputs'
+    for images_dir in image_dirs:
+        images = load_images(images_dir)
+        images_name = os.path.basename(os.path.dirname(images_dir))
+        os.makedirs(os.path.join(root,images_name), exist_ok=True)
+        cv2.imwrite(os.path.join(root,images_name, "l2_mean.png"), pt2cv(images.mean(0).detach().cpu().numpy()))
+        for loss in losses:
+            # results_dir = os.path.join("outputs", os.path.basename(os.path.dirname(images_dir)), loss.name)
+            output_dir = images_dir + "_training_" + loss.name
+            img = optimize_for_mean(images, loss, output_dir, num_steps=1000, lr=0.1, batch_size=4)
+            cv2.imwrite(f"{root}/{images_name}/{loss.name}.png", img)
+
 
 if __name__ == '__main__':
-    images_dir = 'clusters/clinton_front/images'
-    # output_dir = "VGG-Random"
-    images = load_images(images_dir)
-
-    creiterion = ListOfLosses([
-            # LapLoss(n_channels=3, max_levels=1),
-            # L2(),
-            VGGFeatures(5, pretrained=False, post_relu=False),
-            # MMDApproximate(batch_reduction='none', normalize_patch='channel_mean', pool_size=32, pool_strides=16),
-            # SCNNNetwork(),
-            # PatchRBFLaplacianLoss(patch_size=3, batch_reduction='none', normalize_patch='none', ignore_patch_norm=False, device=device)
-    ]#, weights=[0.2, 0.8]
-    )
-    output_dir = images_dir + "_" + creiterion.name
-    img = optimize_for_mean(images, creiterion, output_dir, num_steps=1000, lr=1000.0, batch_size=8)
-
+    batch_run()

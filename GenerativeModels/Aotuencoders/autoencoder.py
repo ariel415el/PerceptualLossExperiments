@@ -26,20 +26,22 @@ class AutoEncoderTraniner:
 
         self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.params.batch_size, self.device)
 
-
         # Define optimizers
         self.optimizerG = optim.Adam(self.generator.parameters(), lr=self.params.lr, betas=(0.5, 0.999))
         self.optimizerE = optim.Adam(self.encoder.parameters(), lr=self.params.lr, betas=(0.5, 0.999))
+
+        self.step = 0
+        self.epoch = 0
 
     def train(self, outptus_dir, epochs=200, vis_freq=1):
         start = time()
         loss_means = []
         losses = []
         pbar = tqdm(total=epochs)
-        step = 0
-        for epoch in range(epochs):
+
+        while self.epoch < epochs:
             for _, images in self.dataloader:
-                step += 1
+                self.step += 1
                 images = images.to(self.device).float()
                 latent_codes = self.encoder(images)
                 fake_images = self.generator(latent_codes)
@@ -51,41 +53,64 @@ class AutoEncoderTraniner:
 
                 self.optimizerE.step()
                 self.encoder.zero_grad()
-                if step % self.params.num_z_steps == 0:
+                if self.step % self.params.num_z_steps == 0:
                     self.optimizerG.step()
                     self.generator.zero_grad()
 
-            if epoch % vis_freq == 0:
-                self._visualize(epoch, self.dataloader.dataset, outptus_dir)
+            if self.epoch % vis_freq == 0:
+                self._visualize(self.epoch, self.dataloader.dataset, outptus_dir)
                 loss_means.append(np.mean(losses))
                 losses = []
                 plot_epoch(loss_means, "Loss", outptus_dir)
-                torch.save(self.encoder.state_dict(), f"{outptus_dir}/encoder.pth")
-                torch.save(self.generator.state_dict(), f"{outptus_dir}/generator.pth")
-                pbar.set_description(f"Epoch: {epoch}: step {step}, im/sec: {(step + 1) * self.params.batch_size / (time() - start):.2f}")
+                self._save_state(outptus_dir)
+                pbar.set_description(f"Epoch: {self.epoch}: step {self.step}, im/sec: {(self.step + 1) * self.params.batch_size / (time() - start):.2f}")
 
-            if (epoch + 1) % self.params.decay_epochs == 0:
+            self.epoch += 1
+
+            if self.epoch % self.params.decay_epochs == 0:
                 for g, e in zip(self.optimizerG.param_groups, self.optimizerE.param_groups):
                     e['lr'] *= self.params.decay_rate
                     g['lr'] *= self.params.decay_rate
 
+    def _save_state(self, folder_path):
+        torch.save(self.encoder.state_dict(), f"{folder_path}/encoder.pth")
+        torch.save(self.generator.state_dict(), f"{folder_path}/generator.pth")
+        torch.save({"optimizerG": self.optimizerG.state_dict(),
+                    "optimizerE": self.optimizerE.state_dict(),
+                    'step': self.step,
+                    'epoch': self.epoch},
+                    f"{folder_path}/train_state.pth")
+
+    def _load_ckpt(self, folder_path):
+        self.encoder.load_state_dict(torch.load(f"{folder_path}/encoder.pth"))
+        self.generator.load_state_dict(torch.load(f"{folder_path}/generator.pth"))
+        train_state_path = f"{folder_path}/rain_stateor.pth"
+        if os.path.exists(train_state_path):
+            train_state = torch.load(train_state_path)
+            self.optimizerE.load_state_dict(train_state['optimizerE'])
+            self.optimizerG.load_state_dict(train_state['optimizerG'])
+            self.step = train_state['step']
+            self.epoch = train_state['epoch']
+
     def _visualize(self, epoch, dataset, outptus_dir):
         os.makedirs(outptus_dir, exist_ok=True)
         debug_indices = np.arange(25)
-        first_imgs = torch.from_numpy(dataset[debug_indices][1])
+        images = np.stack([dataset[x][1] for x in debug_indices])
+        first_imgs = torch.from_numpy(images)
         if epoch == 0:
-            os.makedirs(os.path.join(outptus_dir, "imgs", "reconstructions"), exist_ok=True)
+            os.makedirs(os.path.join(outptus_dir, "reconstructions"), exist_ok=True)
             # dumpy original images fro later reconstruction debug images
-            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', 'originals.png'), normalize=True, nrow=5)
+            vutils.save_image(first_imgs.data, os.path.join(outptus_dir, 'reconstructions', 'originals.png'), normalize=True, nrow=5)
 
         # Reconstructed images
         Irec = self.generator(self.encoder(first_imgs.to(self.device).float()))
-        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'imgs', 'reconstructions', f"step_{epoch}.png"), normalize=True, nrow=5)
+        vutils.save_image(Irec.data, os.path.join(outptus_dir, 'reconstructions', f"step_{epoch}.png"), normalize=True, nrow=5)
 
 
 def endless_iterator(dataloader):
     while True:
         for x in iter(dataloader): yield x
+
 
 def plot_epoch(arr, y_name, outptus_dir):
     plt.plot(np.arange(len(arr)), arr)

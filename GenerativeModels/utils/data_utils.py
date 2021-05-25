@@ -16,7 +16,7 @@ def get_dataloader(dataset, batch_size, device):
 
 class DiskDataset(Dataset):
     def __init__(self, paths, resize=64, crop=False):
-        self.image_paths = paths
+        self.image_paths = np.array(paths)
         self.crop = crop
         self.resize = resize
 
@@ -61,29 +61,6 @@ class MemoryDataset(Dataset):
     def __getitem__(self, idx):
         return idx, self.images[idx]
 
-class MnistDataset(Dataset):
-    def __init__(self, mnist_file):
-        self.imgs = np.load(mnist_file)
-        self.imgs = self.imgs.transpose((0, 3, 1, 2)) / 255.0
-        # self.imgs = np.pad(self.imgs,((0,0),(0,0),(2,2),(2,2)), constant)
-
-    def __len__(self):
-        return len(self.imgs)
-
-    def __getitem__(self, idx):
-        return idx, self.imgs[idx]
-
-class DspriteDatset(Dataset):
-    def __init__(self, dsprite_imgs_file):
-        self.imgs = np.load(dsprite_imgs_file)[:,None]
-
-    def __len__(self):
-        return len(self.imgs)
-
-    def __getitem__(self, idx):
-        return idx, self.imgs[idx]
-
-
 
 def download_ffhq_thumbnails(data_dir):
     print("Downloadint FFHQ-thumbnails from kaggle...")
@@ -96,32 +73,26 @@ def download_ffhq_thumbnails(data_dir):
 
 def get_dataset(dataset_name, resize, split='train'):
     kwargs = dict()
-    if dataset_name == "dsprites":
-        dataset = DspriteDatset(f"../../../../data/dsprites/imgs.npy")
 
-    elif dataset_name == "mnist":
-        dataset = MnistDataset(f"../../../../data/Mnist/{split}_Mnist.npy")
-
-    elif dataset_name in ['celeba', 'ffhq']:
-        if dataset_name == 'celeba':
-            train_samples_path = "../../../../data/img_align_celeba"
-            dataset_type = DiskDataset
-        else:
-            train_samples_path = "../../../../data/FFHQ/thumbnails128x128"
-            if not os.path.exists(train_samples_path):
-                download_ffhq_thumbnails(os.path.dirname(train_samples_path))
-            kwargs['resize'] = resize
-            dataset_type = MemoryDataset
-
-        img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
-        # np.random.shuffle(img_paths)  # Avoid mixing the test and train for test consistency
-        val_size = int(0.15 * len(img_paths))
-        if split == "train":
-            dataset = dataset_type(img_paths[val_size:], **kwargs)
-        else:
-            dataset = dataset_type(img_paths[:val_size], **kwargs)
-
+    if dataset_name == 'celeba':
+        train_samples_path = "../../../../data/img_align_celeba"
+        dataset_type = DiskDataset
+    elif dataset_name == 'ffhq':
+        train_samples_path = "../../../../data/FFHQ/thumbnails128x128"
+        if not os.path.exists(train_samples_path):
+            download_ffhq_thumbnails(os.path.dirname(train_samples_path))
+        kwargs['resize'] = resize
+        dataset_type = MemoryDataset
     else:
-        raise ValueError("No such dataset")
+        raise ValueError("Dataset not supported")
+
+    img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
+
+    val_size = int(0.15 * len(img_paths))
+    if split == "train":
+        dataset = dataset_type(img_paths[val_size:], **kwargs)
+    else:
+        dataset = dataset_type(img_paths[:val_size], **kwargs)
+
 
     return dataset

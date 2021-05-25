@@ -40,7 +40,7 @@ def laplacian_pyramid(img, kernel, max_levels=5):
 
 
 class LapLoss(nn.Module):
-    def __init__(self, max_levels=5, k_size=5, sigma=2.0, n_channels=1):
+    def __init__(self, max_levels=5, k_size=5, sigma=2.0, n_channels=3):
         super(LapLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = kernel_gauss(size=k_size, sigma=sigma, n_channels=n_channels)
