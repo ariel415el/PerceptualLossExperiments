@@ -1,24 +1,57 @@
 import os
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import transforms
 
+from losses.vgg_loss.contextual_loss import contextual_loss
+from losses.vgg_loss.gram_loss import gram_loss
+
+layer_names = ['conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'AP1',
+               'conv2_1', 'relu2_1', 'conv2_2', 'relu2_2', 'AP2',
+               'conv3_1', 'relu3_1', 'conv3_2', 'relu3_2', 'conv3_3', 'relu3_3', 'AP3',
+               'conv4_1', 'relu4_1', 'conv4_2', 'relu4_2', 'conv4_3', 'relu4_3', 'AP4',
+               'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'AP5', ]
+
+
+def layer_names_to_indices(names):
+    return [layer_names.index(n) for n in names]
+
+
 cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
 
 
-class VGGFeatures(nn.Module):
-    def __init__(self, level, pretrained=True, post_relu=False):
-        super(VGGFeatures, self).__init__()
-        self.name = f"VGG_L-{level}"
-        if post_relu:
-            self.layer_ids = [3, 8, 15, 22, 29][:level]
-            self.name += "_PR"
-        else:
-            self.layer_ids = [2, 7, 14, 21, 30][:level]
-        self.level = level
+def get_features_metric(features_metric_name, **kwargs):
+    if features_metric_name == 'l2':
+        return lambda x, y: ((x - y) ** 2).view(x.shape[0], -1).mean(1)
+    elif features_metric_name == 'l1':
+        return lambda x, y: torch.abs(x - y).view(x.shape[0], -1).mean(1)
+    elif features_metric_name == 'gram':
+        return gram_loss
+    elif features_metric_name == 'cx':
+        return lambda x, y: contextual_loss(x, y, **kwargs)
+    else:
+        raise ValueError(f"No such feature metric: {features_metric_name}")
 
-        self.normalize_input = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+class VGGFeatures(nn.Module):
+    def __init__(self, layers_and_weights=None, pretrained=False, reinit=False, norm_first_conv=False,
+                 features_metric_name='l2'):
+        super(VGGFeatures, self).__init__()
+        self.pretrained = pretrained
+        self.reinit = reinit
+        self.norm_first_conv = norm_first_conv
+        self.features_metric = get_features_metric(features_metric_name)
+        assert not (reinit and pretrained), "better not reinit pretrained weights"
+
+        if layers_and_weights:
+            self.layers_and_weights = layers_and_weights
+        else:
+            self.layers_and_weights = [('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0), ('conv5_3', 1.0)]
+
+
         features = []
         in_channels = 3
         for v in cfg:
@@ -30,54 +63,48 @@ class VGGFeatures(nn.Module):
                 in_channels = v
         self.features = nn.Sequential(*features)
 
-        self.pretrained = pretrained
         if pretrained:
             weigths = torch.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), "vgg16_head.pth"))
             self.load_state_dict(weigths)
-            self.name += "_PT"
+        else:
+            self._initialize_weights_randomly()
+        self.name = f"VGG({'_reinit' if reinit else ''}{'_NormFC' if norm_first_conv else ''}{'_PT' if pretrained else ''}_M-{features_metric_name})"
 
     def _initialize_weights_randomly(self):
         i = 0
         for feat in self.features:
             if type(feat) == torch.nn.Conv2d:
                 torch.nn.init.kaiming_normal_(feat.weight)
-                if i == 0:
+                if i == 0 and self.norm_first_conv:
                     i += 1
                     feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
                 torch.nn.init.constant_(feat.bias, 0.)
 
     def get_activations(self, z, normalize=False):
         if normalize:
-            z = self.normalize_input(z)
-        id_max = self.layer_ids[-1] + 1
-        activations = []
-        for i in range(id_max):
-            z = self.features[i](z)
-            if i in self.layer_ids:
-                activations.append(z)
+            normalize_input = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            z = normalize_input(z)
+
+        activations = dict()
+        for i, f in enumerate(self.features):
+            z = f(z)
+            activations[layer_names[i]] = z
         return activations
 
-    def forward(self, I1, I2):
-        if not self.pretrained:
+    def forward(self, x, y):
+        if self.reinit:
             self._initialize_weights_randomly()
-        batch_size = I1.size(0)
-        if I1.size(1) == 1:
-          I1 = I1.expand((I1.size(0), 3, I1.size(2), I1.size(3)))
-          I2 = I2.expand((I2.size(0), 3, I2.size(2), I2.size(3)))
-        if I1.size(2) == 28:
-          I1 = F.pad(I1, (2, 2, 2, 2))
-          I2 = F.pad(I2, (2, 2, 2, 2))
 
-        f1 = self.get_activations(I1)
-        f2 = self.get_activations(I2)
+        fx = self.get_activations(x)
+        fy = self.get_activations(y)
 
-        loss = torch.abs(I1 - I2).view(batch_size, -1).mean(1) # L2 loss
-        for i in range(self.level):
-            layer_loss = torch.abs(f1[i] - f2[i]).view(batch_size, -1).mean(1)
-            loss = loss + layer_loss
+        loss = 0
+        for layer_name, w in self.layers_and_weights:
+            loss += self.features_metric(fx[layer_name], fy[layer_name]) * w
 
         return loss
 
+
 if __name__ == '__main__':
     model = VGGFeatures(3)
-    model(torch.zeros((8,3,64,64)), torch.ones((8,3,64,64)))
+    model(torch.zeros((8, 3, 64, 64)), torch.ones((8, 3, 64, 64)))

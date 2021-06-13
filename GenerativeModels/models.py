@@ -33,8 +33,9 @@ class DCGANGenerator(nn.Module):
         layers = []
         for i in range(len(layer_depths) - 1):
             layers += [
-                nn.ConvTranspose2d(layer_depths[i], layer_depths[i+1], kernel_dim[i], strides[i], padding[i], bias=False),
-                nn.BatchNorm2d(layer_depths[i+1]),
+                nn.ConvTranspose2d(layer_depths[i], layer_depths[i + 1], kernel_dim[i], strides[i], padding[i],
+                                   bias=False),
+                nn.BatchNorm2d(layer_depths[i + 1]),
                 nn.ReLU(True),
             ]
         layers += [
@@ -59,20 +60,19 @@ class DCGANEncoder(nn.Module):
         else:
             raise ValueError("Image dim supports only 28, 64, 128")
         layers = []
-        for i in range(len(layer_depth)-1):
+        for i in range(len(layer_depth) - 1):
             layers += [
-                nn.Conv2d(layer_depth[i], layer_depth[i+1], 4, 2, 1, bias=False),
-                nn.BatchNorm2d(layer_depth[i+1]),
+                nn.Conv2d(layer_depth[i], layer_depth[i + 1], 4, 2, 1, bias=False),
+                nn.BatchNorm2d(layer_depth[i + 1]),
                 nn.ReLU(True)
-                ]
+            ]
         layers.append(nn.Conv2d(layer_depth[-1], output_latent_dim, 4, 1, 0, bias=False))
         self.convs = nn.Sequential(*layers)
 
-
     def forward(self, input):
-            input = input
-            output = self.convs(input).view(input.size(0), -1)
-            return output
+        input = input
+        output = self.convs(input).view(input.size(0), -1)
+        return output
 
 
 class LatentMapper(nn.Module):
@@ -97,6 +97,54 @@ class LatentMapper(nn.Module):
         z = self.lin_out(z)
         return z
 
+
+class MLPGenerator(nn.Module):
+    def __init__(self, input_dim, channels, output_img_dim=28):
+        super(MLPGenerator, self).__init__()
+        self.channels = channels
+        self.output_img_dim = output_img_dim
+        self.img_dim = output_img_dim
+
+        def block(in_feat, out_feat, normalize=True):
+            layers = [nn.Linear(in_feat, out_feat)]
+            if normalize:
+                layers.append(nn.BatchNorm1d(out_feat, 0.8))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+
+        self.model = nn.Sequential(
+            *block(input_dim, 128, normalize=False),
+            *block(128, 256),
+            *block(256, 512),
+            *block(512, 1024),
+            nn.Linear(1024, channels * output_img_dim ** 2),
+            nn.Tanh()
+        )
+
+    def forward(self, z):
+        img = self.model(z)
+        img = img.view(img.size(0), self.channels, self.img_dim, self.img_dim)
+        return img
+
+
+class MLPEncoder(nn.Module):
+    def __init__(self, input_img_dim, channels, output_latent_dim):
+        super(MLPEncoder, self).__init__()
+
+        self.model = nn.Sequential(
+            nn.Linear(channels * input_img_dim ** 2, 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(256, output_latent_dim),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, img):
+        img_flat = img.view(img.size(0), -1)
+        validity = self.model(img_flat)
+
+        return validity
 
 
 if __name__ == '__main__':
@@ -124,14 +172,12 @@ if __name__ == '__main__':
     # optimizer = torch.optim.Adam(list(model.parameters()), lr=0.1)
 
     for i in range(10000):
-        if (i+1) % 100 == 0:
+        if (i + 1) % 100 == 0:
             for g in optimizer.param_groups:
                 g['lr'] *= 0.8
             print(i, loss.item())
-            vutils.save_image(output[0], 'generated.png',normalize=True)
+            vutils.save_image(output[0], 'generated.png', normalize=True)
         output = decoder(input)
         loss = torch.nn.MSELoss()(output, target)
         loss.backward()
         optimizer.step()
-
-

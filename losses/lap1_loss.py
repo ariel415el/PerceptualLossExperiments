@@ -50,9 +50,9 @@ class LapLoss(nn.Module):
         self._gauss_kernel = self._gauss_kernel.to(output.device)
         pyramid_output = laplacian_pyramid(output, self._gauss_kernel, self.max_levels)
         pyramid_target = laplacian_pyramid(target, self._gauss_kernel, self.max_levels)
-        # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
+        lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output[::-1], pyramid_target[::-1])))
         # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (-2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
-        lap1_loss = sum(F.l1_loss(a, b) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
+        # lap1_loss = sum(F.l1_loss(a, b) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
         l2_loss = nn.MSELoss()(output, target)
 
         return lap1_loss + l2_loss

@@ -8,12 +8,12 @@ from GenerativeModels.GLO.IMLE import IMLE
 from config import faces_config
 import sys
 
-
 sys.path.append(os.path.realpath("../.."))
 from losses.patch_loss import PatchRBFLoss
 from losses.l2 import L2
 from losses.lap1_loss import LapLoss
 from losses.patch_mmd_loss import MMDApproximate
+from losses.patch_mmd_pp import MMD_PP
 from losses.vgg_loss.vgg_loss import VGGFeatures
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
 from GenerativeModels.utils.data_utils import get_dataset
@@ -22,42 +22,27 @@ from GLO import GLOTrainer
 from GenerativeModels import models
 
 sys.path.append(os.path.realpath("../.."))
-from losses.utils import ListOfLosses
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
 
-def train_GLO(dataset_name, train_dir):
-    train_dataset = get_dataset('ffhq', split='train')
+def train_GLO(dataset_name, train_name):
     glo_params = faces_config
+    train_dataset = get_dataset(dataset_name, split='test', resize=faces_config.img_dim)
 
     # define the generator
-    # generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
-    generator = models.WAE_Decoder(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
+    generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
 
     # Define the loss criterion
-    criterion = ListOfLosses(
-        [
-            L2(),
-            # VGGFeatures(3 if glo_params.img_dim == 28 else 5, pretrained=True, post_relu=True),
-            # LapLoss(max_levels=3 if glo_params.img_dim == 28 else 5, n_channels=glo_params.channels),
-            # MMD()
-            # MMDApproximate(patch_size=3, sigma=0.06, strides=1, r=1024, pool_size=8, pool_strides=4, normalize_patch='channel_mean', pad_image=True),
-            # PatchRBFLoss(patch_size=3, sigma=0.1, pad_image=True, device=device)
-            # MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='mean'),
-            # self.dist = ScnnLoss()
-        ]
-        # , weights=[0.001, 0.05, 1.0]
-    )
+    criterion = VGGFeatures(pretrained=True)
+    # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
+    # criterion = MMD_PP(device, patch_size=5, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean', weights=[0.001, 0.05, 1.0])
 
-    outptus_dir = train_dir
+    outptus_dir = os.path.join('outputs', train_name, criterion.name)
     glo_trainer = GLOTrainer(glo_params, generator, criterion, train_dataset, device)
-    glo_trainer.train(outptus_dir)
-
-    # # Save trained model and data embedding
-    # torch.save(glo_trainer.latent_codes.state_dict(), f"{outptus_dir}/latent_codes.pth")
-    # torch.save(generator.state_dict(), f"{outptus_dir}/generator.pth")
+    # glo_trainer._load_ckpt(outptus_dir)
+    glo_trainer.train(outptus_dir, epochs=glo_params.num_epochs)
 
 
 def train_latent_samplers(train_dir):
@@ -93,7 +78,7 @@ def test_models(train_dir):
 
     # plot reconstructions
     latent_codes = data_embeddings[torch.arange(64)]
-    vutils.save_image(generator(latent_codes).cpu(), f"{train_dir}/imgs/Reconstructions.png", normalize=True)
+    vutils.save_image(generator(latent_codes).cpu(), f"{train_dir}/Reconstructions.png", normalize=True)
 
     samplers = [NormalSampler(data_embeddings, device),
                 MappingSampler(imle_mapping, "IMLE", "normal", device),
@@ -101,10 +86,11 @@ def test_models(train_dir):
                 ]
 
     # train_dataset = get_dataset('ffhq', split='train')
-    test_dataset = get_dataset('ffhq', split='test')
+    # test_dataset = get_dataset('ffhq', split='test', resize=glo_params.img_dim)
 
     for sampler in samplers:
-        vutils.save_image(generator(sampler.sample(64)), f"{train_dir}/imgs/{sampler.name}_generated_images.png", normalize=True)
+        vutils.save_image(generator(sampler.sample(64)), f"{train_dir}/{sampler.name}_generated_images.png",
+                          normalize=True)
         # find_nearest_neighbor(generator, sampler, train_dataset, train_dir)
 
     for sampler in samplers[1:]:
@@ -126,14 +112,17 @@ def plot_GLO_variance():
         data_embeddings = torch.load(os.path.join(dir_name, 'latent_codes.pth'), map_location=device)['emb.weight']
         vutils.save_image(generator(data_embeddings[:64]), f"tmps/{name}_recs.png", normalize=True)
         for sigma in [0.00001, 0.001, 0.01, 0.1]:
-            noise = torch.from_numpy(np.random.multivariate_normal(data_embeddings[6].cpu().numpy(), torch.eye(glo_params.z_dim)*sigma, size=64)).to(device).float()
+            noise = torch.from_numpy(np.random.multivariate_normal(data_embeddings[6].cpu().numpy(),
+                                                                    torch.eye(glo_params.z_dim) * sigma,
+                                                                    size=64)).to(device).float()
             imgs = generator(noise)
-            vutils.save_image((imgs+1)/2, f"tmps/{name}_{sigma}-{imgs.min():.3f}_{imgs.max():.3f}.png",normalize=False)
+            vutils.save_image((imgs + 1) / 2, f"tmps/{name}_{sigma}-{imgs.min():.3f}_{imgs.max():.3f}.png",
+                              normalize=False)
 
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_dir = 'outputs/WAE-arch/l2'
-    train_GLO('ffhq', train_dir)
-    # train_latent_samplers(train_dir)
-    # test_models(train_dir)
+    # train_GLO('ffhq', "ffhq_128")
+    train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
+    train_latent_samplers(train_dir)
+    test_models(train_dir)

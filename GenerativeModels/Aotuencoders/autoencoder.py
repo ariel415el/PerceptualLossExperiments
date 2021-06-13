@@ -21,7 +21,8 @@ class AutoEncoderTraniner:
         self.params = params
         self.generator = generator.to(device)
         self.encoder = encoder.to(device)
-        self.generator.apply(weights_init)
+        # self.generator.apply(weights_init)
+        # self.encoder.apply(weights_init)
         self.criterion = criterion.to(device)
 
         self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.params.batch_size, self.device)
@@ -32,10 +33,10 @@ class AutoEncoderTraniner:
 
         self.step = 0
         self.epoch = 0
+        self.loss_means = []
 
     def train(self, outptus_dir, epochs=200, vis_freq=1):
         start = time()
-        loss_means = []
         losses = []
         pbar = tqdm(total=epochs)
 
@@ -59,9 +60,9 @@ class AutoEncoderTraniner:
 
             if self.epoch % vis_freq == 0:
                 self._visualize(self.epoch, self.dataloader.dataset, outptus_dir)
-                loss_means.append(np.mean(losses))
+                self.loss_means.append(np.mean(losses))
                 losses = []
-                plot_epoch(loss_means, "Loss", outptus_dir)
+                plot_epoch(self.loss_means, "Loss", outptus_dir)
                 self._save_state(outptus_dir)
                 pbar.set_description(f"Epoch: {self.epoch}: step {self.step}, im/sec: {(self.step + 1) * self.params.batch_size / (time() - start):.2f}")
 
@@ -78,19 +79,21 @@ class AutoEncoderTraniner:
         torch.save({"optimizerG": self.optimizerG.state_dict(),
                     "optimizerE": self.optimizerE.state_dict(),
                     'step': self.step,
-                    'epoch': self.epoch},
+                    'epoch': self.epoch,
+                    'loss_means': self.loss_means},
                     f"{folder_path}/train_state.pth")
 
     def _load_ckpt(self, folder_path):
         self.encoder.load_state_dict(torch.load(f"{folder_path}/encoder.pth"))
         self.generator.load_state_dict(torch.load(f"{folder_path}/generator.pth"))
-        train_state_path = f"{folder_path}/rain_stateor.pth"
+        train_state_path = f"{folder_path}/train_state.pth"
         if os.path.exists(train_state_path):
             train_state = torch.load(train_state_path)
             self.optimizerE.load_state_dict(train_state['optimizerE'])
             self.optimizerG.load_state_dict(train_state['optimizerG'])
             self.step = train_state['step']
             self.epoch = train_state['epoch']
+            self.loss_means = train_state['loss_means']
 
     def _visualize(self, epoch, dataset, outptus_dir):
         os.makedirs(outptus_dir, exist_ok=True)

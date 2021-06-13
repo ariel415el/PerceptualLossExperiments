@@ -5,6 +5,9 @@ import torch
 from tqdm import tqdm
 
 from GenerativeModels.utils.data_utils import get_dataloader
+from GenerativeModels.utils.fid_scroe.fid_score import calculate_frechet_distance
+from GenerativeModels.utils.fid_scroe.inception import InceptionV3
+from GenerativeModels.utils.swd import swd
 
 
 def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device):
@@ -12,8 +15,8 @@ def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dat
      to the test distribution"""
     batch_size = 128
 
-    test_dataloader = get_dataloader(test_dataset, batch_size, device)
-    train_dataloader = get_dataloader(train_dataset, batch_size, device)
+    test_dataloader = get_dataloader(test_dataset, batch_size, device, drop_last=False)
+    train_dataloader = get_dataloader(train_dataset, batch_size, device, drop_last=False)
 
     inception_model = InceptionV3([3]).to(device).eval()
 
@@ -29,7 +32,7 @@ def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dat
             data_dict['test'].append(act)
 
             # get activations for real images from train set
-            _, images = train_dataloader.dataset[indices]
+            images = np.stack([train_dataloader.dataset[x][1] for x in indices])
             images = torch.from_numpy(images)
             act = inception_model.get_activations(images, device).astype(np.float64)
             data_dict['train'].append(act)
@@ -59,4 +62,38 @@ def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dat
         if k != 'test':
             fid_score = calculate_frechet_distance(test_mu, test_cov, mu, cov)
             f.write(f"{k} vs test data FID: {fid_score:.2f}\n")
+    f.close()
+
+
+def run_swd_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device):
+    n_samples = len(test_dataset)
+    batch_size = 128
+
+    data_dict = {"test": torch.from_numpy([test_dataset[i][1] for i in range(len(test_dataset))]),
+                 "train": torch.from_numpy([train_dataset[i][1] for i in range(len(test_dataset))])}
+
+    with torch.no_grad():
+        images = []
+        for i in range(n_samples // batch_size):
+            images.append(generator(data_embeddings[i*batch_size: (i+1)*batch_size]).cpu())
+        leftover = n_samples % batch_size
+        if leftover > 0:
+            images.append(generator(data_embeddings[-leftover:]).cpu())
+            data_dict['reconstructions'] = torch.cat(images)
+
+        for sampler in samplers:
+            images = []
+            for i in range(n_samples // batch_size):
+                    images.append(generator(sampler.sample(batch_size)).cpu())
+            leftover = n_samples % batch_size
+            if leftover > 0:
+                images.append(generator(sampler.sample(leftover)).cpu())
+            data_dict[sampler.name] = torch.cat(images)
+
+    print("Computing SWD scores")
+    f = open(os.path.join(train_dir, "SWD-scores.txt"), 'w')
+    for k, data in data_dict.items():
+        if k != 'test':
+            swd_score = swd(data_dict['test'].float(), data.float(), device='cuda')
+            f.write(f"{k} vs test data FID: {swd_score:.2f}\n")
     f.close()
