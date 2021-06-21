@@ -40,7 +40,7 @@ def laplacian_pyramid(img, kernel, max_levels=5):
 
 
 class LapLoss(nn.Module):
-    def __init__(self, max_levels=5, k_size=5, sigma=2.0, n_channels=3):
+    def __init__(self, max_levels=3, k_size=5, sigma=2.0, n_channels=3):
         super(LapLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = kernel_gauss(size=k_size, sigma=sigma, n_channels=n_channels)
@@ -50,7 +50,8 @@ class LapLoss(nn.Module):
         self._gauss_kernel = self._gauss_kernel.to(output.device)
         pyramid_output = laplacian_pyramid(output, self._gauss_kernel, self.max_levels)
         pyramid_target = laplacian_pyramid(target, self._gauss_kernel, self.max_levels)
-        lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output[::-1], pyramid_target[::-1])))
+        lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
+        # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output[::-1], pyramid_target[::-1])))
         # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (-2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
         # lap1_loss = sum(F.l1_loss(a, b) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
         l2_loss = nn.MSELoss()(output, target)

@@ -36,7 +36,7 @@ class PatchLoss(torch.nn.Module):
         self.normalize_patch = normalize_patch
         self.unfolder = torch.nn.Unfold(kernel_size=patch_size, stride=strides, padding=self.padding)
         self.ignore_patch_norm = ignore_patch_norm
-        self.name = 'PatchLoss'
+        self.name = f"PatchLoss(p={patch_size})"
 
     def _channel_reduction_op(self, diffs):
         raise NotImplementedError()
@@ -82,6 +82,7 @@ class PatchRBFLoss(PatchLoss):
     def __init__(self, patch_size, strides=1, scale=1., spatial_reduction='mean', batch_reduction='mean', sigma=0.5, pad_image=False, **patch_loss_kwargs):
         super(PatchRBFLoss, self).__init__(patch_size=patch_size, strides=strides, scale=scale, spatial_reduction=spatial_reduction, batch_reduction=batch_reduction, pad_image=pad_image, **patch_loss_kwargs)
         self.sigma = sigma * self.patch_size[0] * self.patch_size[1]
+        self.name = f"PatchLoss(p={patch_size},s={sigma})"
 
 
 class PatchRBFLaplacianLoss(PatchLoss):

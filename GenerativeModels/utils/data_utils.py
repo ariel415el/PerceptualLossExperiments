@@ -73,7 +73,7 @@ def download_ffhq_thumbnails(data_dir):
     print("Done.")
 
 
-def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ariel/university/data'):
+def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ariel/university/data', val_percent=0.15):
     kwargs = dict()
 
     if dataset_name == 'celeba':
@@ -91,7 +91,7 @@ def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ar
 
     img_paths = [os.path.join(train_samples_path, x) for x in os.listdir(train_samples_path)]
 
-    val_size = int(0.15 * len(img_paths))
+    val_size = int(val_percent * len(img_paths))
     if split == "train":
         dataset = dataset_type(img_paths[val_size:], **kwargs)
     else:

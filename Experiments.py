@@ -14,12 +14,12 @@ from GenerativeModels.utils.data_utils import get_dataset, get_dataloader
 from losses.l2 import L2
 from losses.patch_mmd_loss import MMDApproximate
 from losses.patch_mmd_pp import MMD_PP
-from losses.vgg_loss.vgg_loss import VGGFeatures
+from losses.vgg_loss.vgg_loss import VGGFeatures, VGGPerceptualLoss
 
-device = torch.device("cuda")
 
 
 def embedd_data(dataset, encoder, batch_size):
+    """Batch encoding of entire dataset with a given encoder"""
     dataloader = get_dataloader(dataset, batch_size, device, drop_last=False, shuffle=False)
 
     with torch.no_grad():
@@ -59,8 +59,8 @@ def generate_interpolations_to_nn(train_dataset, indices, outputs_dir, n_steps, 
     encoder, generator = load_models('GenerativeModels/Aotuencoders/outputs/ffhq_128/VGG-None_PT')
     embeddings = embedd_data(train_dataset, encoder, params.batch_size)
     losses = [
-        VGGFeatures(pretrained=True, post_relu=True).to(device),
-        VGGFeatures(pretrained=False, post_relu=True).to(device),
+        VGGPerceptualLoss(pretrained=True).to(device),
+        VGGPerceptualLoss(pretrained=False).to(device),
         MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean').to(device),
         MMD_PP(device, patch_size=3, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean',
                weights=[0.05, 0.1, 1.0])
@@ -86,8 +86,8 @@ def generate_interpolations_to_nn(train_dataset, indices, outputs_dir, n_steps, 
                                   os.path.join(outputs_dir, 'interpolations', f"interpolation_to-{j}_{i}", f"{k}.png"),
                                   normalize=True)
                 for loss in losses:
-                    losses_first[loss.name].append(loss(image, neighbors[0].unsqueeze(0).float().cuda()).item())
-                    losses_last[loss.name].append(loss(image, neighbors[j].unsqueeze(0).float().cuda()).item())
+                    losses_first[loss.name].append(loss(image, neighbors[0].unsqueeze(0).float().to(device)).item())
+                    losses_last[loss.name].append(loss(image, neighbors[j].unsqueeze(0).float().to(device)).item())
 
             save_batch(generator(torch.stack(interpolations[j])),
                        os.path.join(outputs_dir, 'interpolations', f"interpolation_to-{j}_{i}"))
@@ -101,11 +101,11 @@ def generate_interpolations_to_nn(train_dataset, indices, outputs_dir, n_steps, 
 
 
 def sample_latent_neighbors(outputs_dir):
+    """Find nearest latent neighbors of data samples and create sets of original/reconstructed similar images """
     # Load models
     encoder, generator = load_models('GenerativeModels/Aotuencoders/outputs/ffhq_128/VGG-None_PT')
     embeddings = embedd_data(train_dataset, encoder, params.batch_size)
-    # for i in [5,6,7,10,11,12,15,16,17]:
-    for i in [1,4,6,10]:
+    for i in [1, 4, 6, 10]:
         os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"data_neighbors{i}"), exist_ok=True)
         os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"reconstructions{i}"), exist_ok=True)
         os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"latent_neighbors_gauss{i}"), exist_ok=True)
@@ -175,6 +175,47 @@ def analyze_perceptual_features_intencities():
                 f"\t{i}: {layer_means[loss_name][i].mean(), layer_means[loss_name][i].min(), layer_means[loss_name][i].max(), layer_means[loss_name][i].std()}")
 
 
+def invert_perceptual_features(dataset):
+    """Optimize noise to match feature maps of vgg and visualize the results"""
+    n = 4
+    nets = [VGGFeatures(pretrained=True).to(device), VGGFeatures(pretrained=False).to(device), VGGFeatures(pretrained=False, norm_first_conv=True).to(device)]
+    # nets = [VGGFeatures(pretrained=True).to(device)]
+    results = dict()
+    for net in nets:
+        images = torch.from_numpy(np.stack([dataset[x][1] for x in range(n)])).float().to(device)
+        features_org = net.get_activations(images)
+        criterion = torch.nn.MSELoss()
+        results[net.name] = dict()
+        for layer_name in ['conv1_2', 'conv2_2', 'conv3_2', 'conv4_2', 'conv5_2']:
+
+            output_images = torch.randn(images.shape).to(device).float() *0.225
+            output_images.requires_grad_(True)
+            optimizer = torch.optim.Adam([output_images], lr=0.1)
+            pbar = tqdm(range(1000))
+            for i in pbar:
+                features_opt = net.get_activations(output_images)
+                loss = criterion(features_opt[layer_name], features_org[layer_name])
+
+                loss.backward(retain_graph=True)
+                optimizer.step()
+                optimizer.zero_grad()
+                pbar.set_description(f"Loss: {loss.item()}")
+
+                if (i + 1) % 100 == 0:
+                    for g in optimizer.param_groups:
+                        g['lr'] *= 0.75
+
+            # normalize output image
+            res = output_images.detach().cpu()
+            res -= res.min()
+            res /= res.max()
+            res = res * 2 - 1
+
+            results[net.name][layer_name] = res
+            # results[net.name][layer_name] = output_images.detach().cpu()
+        vutils.save_image(torch.cat([images.detach().cpu(), *results[net.name].values()]), os.path.join(outputs_dir, f"{net.name}.png"), normalize=True, nrow=n)
+
+
 def mix_patches():
     def perm_patch(x):
         x_unfolded = unfold(x[:, :, :32, :32])
@@ -200,16 +241,17 @@ def mix_patches():
 
 
 def optimize_model(outputs_dir, train_dataset, n=25):
-    encoder, generator = load_models('GenerativeModels/Aotuencoders/outputs/ffhq_128/L2/')
+    # encoder, generator = load_models('GenerativeModels/Aotuencoders/outputs/ffhq_128/L2/')
+    encoder, generator = load_models()
     encoder.train()
     generator.train()
 
     # criterion = MMD_PP(device, patch_size=7, pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean',
     #                    weights=[0.001, 0.05, 1.0]).to(device)
     # criterion = L2().to(device)
-    # criterion = VGGFeatures(pretrained=True, weights=[0,1,1,1,1,1]).to(device)
-    # criterion = MMDApproximate(patch_size=7, pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean').to(device)
     criterion = VGGFeatures(pretrained=True).to(device)
+    # criterion = MMDApproximate(patch_size=7, pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean').to(device)
+    # criterion = VGGFeatures(pretrained=True).to(device)
     # criterion = VGGFeatures(pretrained=False, norm_first_conv=True, reinit=True, weights=[1,1,1,1,1,1]).to(device)
 
     images = torch.from_numpy(np.array([train_dataset[i][1] for i in range(n)])).to(device).float()
@@ -219,8 +261,9 @@ def optimize_model(outputs_dir, train_dataset, n=25):
     # Define optimizers
     optimizerG = torch.optim.Adam(generator.parameters(), lr=0.001)
     optimizerE = torch.optim.Adam(encoder.parameters(), lr=0.001)
-    for i in range(201):
-        if i % 50 == 0:
+    pbar = tqdm(range(10001))
+    for i in pbar:
+        if i % 500 == 0:
             recons = generator(encoder(images))
             vutils.save_image(recons, os.path.join(outputs_dir, f"recons{i}.png"), normalize=True, nrow=int(np.sqrt(n)))
 
@@ -234,23 +277,25 @@ def optimize_model(outputs_dir, train_dataset, n=25):
         encoder.zero_grad()
         optimizerG.step()
         generator.zero_grad()
-        print(rec_loss)
-
-        if (i + 1) % 50 == 0:
+        pbar.set_description(f"loss: {rec_loss}")
+        if (i + 1) % 1000 == 0:
             for g, e in zip(optimizerG.param_groups, optimizerE.param_groups):
                 e['lr'] *= 0.9
                 g['lr'] *= 0.9
 
 
 if __name__ == '__main__':
+    device = torch.device("cuda")
     # mix_patches()
     # analyze_perceptual_features_intencities()
     outputs_dir = 'GenerativeModels/Experiments_outputs'
     os.makedirs(outputs_dir, exist_ok=True)
 
     params = faces_config
-    train_dataset = get_dataset('ffhq', split='train', resize=params.img_dim)
+    train_dataset = get_dataset('ffhq', split='test', resize=params.img_dim)
 
-    optimize_model(outputs_dir, train_dataset, n=7)
+    invert_perceptual_features(train_dataset)
+
+    # optimize_model(outputs_dir, train_dataset, n=64)
     # generate_interpolations_to_nn(train_dataset, [6, 55, 56, 57, 58], outputs_dir, n_steps=50, n_neighbors=5)
     # sample_latent_neighbors(outputs_dir)

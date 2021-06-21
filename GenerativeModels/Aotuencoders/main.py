@@ -12,8 +12,9 @@ from GenerativeModels.utils.test_utils import run_FID_tests, run_swd_tests
 from losses.experimental_patch_losses import MMD_PPP
 from losses.l2 import L2, L1
 from losses.lap1_loss import LapLoss
+from losses.patch_loss import PatchRBFLoss
 from losses.patch_mmd_pp import MMD_PP
-from losses.vgg_loss.vgg_loss import VGGFeatures
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 sys.path.append(os.path.realpath("../.."))
 from GenerativeModels.Aotuencoders.autoencoder import AutoEncoderTraniner
@@ -31,7 +32,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train_autoencoder(dataset_name, train_name, tag):
     params = faces_config
-    train_dataset = get_dataset(dataset_name, split='test', resize=params.img_dim)
+    train_dataset = get_dataset(dataset_name, split='test', resize=params.img_dim, val_percent=0.01)
+    print("Dataset size: ", len(train_dataset))
 
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
@@ -45,14 +47,18 @@ def train_autoencoder(dataset_name, train_name, tag):
     # Define the loss criterion
     # criterion = L1()
     # criterion = LapLoss()
-    # criterion = VGGFeatures(pretrained=False, norm_first_conv=True, reinit=True, weights=[0, 1, 1, 1, 1, 1])
-    # criterion = VGGFeatures(pretrained=True)
+    # criterion = MMD_PPP(device, r=256, weights=[0.001, 0.05, 0.1, 1.0], batch_reduction='none')
+
+    criterion = VGGPerceptualLoss(pretrained=True)
+    # criterion = VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 0.562), ('conv2_2', 0.098), ('conv3_3', 0.031), ('conv4_3', 0.105), ('conv5_3', 0.904)])
+    # criterion = VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True)
     # criterion = MMD_PP(device, patch_size=3, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean', weights=[0, 0.2, 1.0])
 
     # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
     # criterion = MMD_PPP(r=64, pool_size=32, pool_strides=16, normalize_patch='channel_mean', device=device)
-    criterion = MMD_PP(device, patch_size=3, pool_size=32, pool_strides=16, r=64, normalize_patch='channel_mean',
-                       weights=[0.001, 0.05, 1.0])
+    # criterion = MMD_PP(device, patch_size=3, pool_size=16, pool_strides=8, r=64, normalize_patch='channel_mean',
+    #                    weights=[0.001, 0.05, 1.0], local_sigma=0.02, local_patch_size=11)
+    # criterion = PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, device=device, batch_reduction='none')
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     trainer = AutoEncoderTraniner(faces_config, encoder, generator, criterion, train_dataset, device)
@@ -131,7 +137,7 @@ def evaluate_generator(outputs_dir):
 
 
 if __name__ == '__main__':
-    train_name = f"ffhq_64_experiments"
-    train_autoencoder('ffhq', train_name, '_test_data_small_dnns')
+    train_name = f"ffhq_128_experiments"
+    train_autoencoder('ffhq', train_name, 'one_perce_test')
     # train_latent_samplers('outputs/ffhq_128/VGG-None_PT')
     # evaluate_generator('outputs/ffhq_128/VGG-None_PT')

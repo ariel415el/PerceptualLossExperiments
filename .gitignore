@@ -5,14 +5,12 @@
 /losses/vgg_loss/vgg16-397923af.pth
 /kmeans/output_dir
 /kmeans/pmo_output_dir
-/perceptual_mean_optimization/outputs
 
 /GenerativeModels/GLO/outputs
 /GenerativeModels/GMMN/outputs
 /GenerativeModels/Aotuencoders/outputs
+/GenerativeModels/Experiments_outputs
 /style_transfer/outputs
 /style_transfer/imgs
 /perceptual_mean_optimization/clusters
-/perceptual_mean_optimization/batch_outputs
-/perceptual_mean_optimization/image_clusters
-/perceptual_mean_optimization/vid_clusters
+/perceptual_mean_optimization/outputs
