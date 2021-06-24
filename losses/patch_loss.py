@@ -10,7 +10,7 @@ from losses.patch_mmd_loss import get_reduction_fn
 
 class PatchLoss(torch.nn.Module):
     def _sum_over_patches(self, diffs):
-        return conv2d(diffs, self.sum_w, stride=self.strides, padding=self.padding)
+        return conv2d(diffs, self.sum_w.to(diffs.device), stride=self.strides, padding=self.padding)
 
     def _extract_patches(self, x):
         patches = self.unfolder(x)
@@ -21,13 +21,13 @@ class PatchLoss(torch.nn.Module):
         return patches.view(bs, c, ps, ps, nh, nw)
 
 
-    def __init__(self, patch_size, strides=1, scale=1., spatial_reduction='mean', batch_reduction='mean', pad_image=False, normalize_patch='none', ignore_patch_norm=False, device=torch.device("cpu")):
+    def __init__(self, patch_size, strides=1, scale=1., spatial_reduction='mean', batch_reduction='mean', pad_image=False, normalize_patch='none', ignore_patch_norm=False):
         super(PatchLoss, self).__init__()
         self.patch_size = (patch_size, patch_size) if type(patch_size) == int else patch_size
         self.strides = strides
         self.scale = scale
         w_np = np.ones((1, 1, self.patch_size[0], self.patch_size[1]))
-        self.sum_w = torch.from_numpy(w_np).to(device).float()
+        self.sum_w = torch.from_numpy(w_np).float()
         self.sum_w.requires_grad_ = False
         self.spatial_reduction = get_reduction_fn(spatial_reduction)
         self.batch_reduction = get_reduction_fn(batch_reduction)

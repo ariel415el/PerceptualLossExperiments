@@ -84,8 +84,8 @@ def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ar
         if not os.path.exists(train_samples_path):
             download_ffhq_thumbnails(os.path.dirname(train_samples_path))
         kwargs['resize'] = resize
-        dataset_type = DiskDataset
-        # dataset_type = MemoryDataset
+        # dataset_type = DiskDataset
+        dataset_type = MemoryDataset
     else:
         raise ValueError("Dataset not supported")
 

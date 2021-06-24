@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 from PIL import Image
 
 import torch
@@ -6,6 +8,8 @@ import torchvision
 import torchvision.transforms as transforms
 
 # mean and std of ImageNet to use pre-trained VGG
+from losses.vgg_loss.gram_loss import gram_loss
+
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
@@ -61,11 +65,17 @@ def imload(path, imsize=None, cropsize=None):
 mse_criterion = torch.nn.MSELoss(reduction='mean')
 
 
-def calc_loss(features_list_1, features_list_2, feature_metric):
+def calc_loss(features_list_1, features_list_2, feature_metric, normalize=False):
     loss = 0
     for f, t in zip(features_list_1, features_list_2):
-        loss += feature_metric(f, t)
-    return loss / len(features_list_1)
+        layer_loss = feature_metric(f, t)
+        if normalize:
+            layer_loss /= np.prod(f.shape[1:])
+        loss += layer_loss
+    if features_list_1:
+        loss /= len(features_list_1)
+    return loss
+
 
 
 def calc_TV_Loss(x):

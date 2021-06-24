@@ -1,4 +1,5 @@
 ##### Taken from https://github.com/koshian2/swd-pytorch #####
+import os
 
 from PIL import Image
 import numpy as np
@@ -6,8 +7,11 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-
 # Gaussian blur kernel
+from matplotlib import pyplot as plt
+from scipy import ndimage
+
+
 def get_gaussian_kernel(device="cpu"):
     kernel = np.array([
         [1, 4, 6, 4, 1],
@@ -77,8 +81,7 @@ def minibatch_laplacian_pyramid(image, n_pyramids, batch_size, device="cpu"):
     return result
 
 
-def extract_patches(pyramid_layer, slice_indices,
-                    slice_size=7, unfold_batch_size=128, device="cpu"):
+def extract_patches(pyramid_layer, slice_indices, slice_size=7, unfold_batch_size=128, device="cpu"):
     assert pyramid_layer.ndim == 4
     n = pyramid_layer.size(0) // unfold_batch_size + np.sign(pyramid_layer.size(0) % unfold_batch_size)
     # random slice 7x7
@@ -88,7 +91,7 @@ def extract_patches(pyramid_layer, slice_indices,
         ind_start = i * unfold_batch_size
         ind_end = min((i + 1) * unfold_batch_size, pyramid_layer.size(0))
         x = pyramid_layer[ind_start:ind_end].unfold(2, slice_size, 1).unfold(3, slice_size, 1).reshape(
-                                                 ind_end - ind_start, pyramid_layer.size(1), -1, slice_size, slice_size)
+            ind_end - ind_start, pyramid_layer.size(1), -1, slice_size, slice_size)
         # [unfold_batch_size, ch, n_descriptors, slice_size, slice_size]
         x = x[:, :, slice_indices, :, :]
         # [unfold_batch_size, n_descriptors, ch, slice_size, slice_size]
@@ -103,10 +106,10 @@ def extract_patches(pyramid_layer, slice_indices,
     return x
 
 
-def swd(image1, image2,
-        n_pyramids=None, slice_size=7, n_descriptors=128,
-        n_repeat_projection=128, proj_per_repeat=4, device="cpu", return_by_resolution=False,
-        pyramid_batchsize=128):
+def compute_swd(image1, image2,
+                n_pyramids=None, slice_size=7, n_descriptors=128,
+                n_repeat_projection=128, proj_per_repeat=4, device="cpu", return_by_resolution=False,
+                pyramid_batchsize=128, no_grad_condition=True):
     # n_repeat_projectton * proj_per_repeat = 512
     # Please change these values according to memory usage.
     # original = n_repeat_projection=4, proj_per_repeat=128
@@ -115,7 +118,7 @@ def swd(image1, image2,
 
     if n_pyramids is None:
         n_pyramids = int(np.rint(np.log2(image1.size(2) // 16)))
-    with torch.no_grad():
+    with torch.set_grad_enabled(not no_grad_condition):
         # minibatch laplacian pyramid for cuda memory reasons
         pyramid1 = minibatch_laplacian_pyramid(image1, n_pyramids, pyramid_batchsize, device=device)
         pyramid2 = minibatch_laplacian_pyramid(image2, n_pyramids, pyramid_batchsize, device=device)
@@ -158,10 +161,15 @@ def swd(image1, image2,
         else:
             return torch.mean(result).cpu()
 
-if __name__ == '__main__':
-    import torch
-    torch.manual_seed(123)  # fix seed
-    x1 = torch.rand(1, 3, 64, 64).repeat(1024, 1, 1, 1)  # 1024 images, 3 chs, 128x128 resolution
-    x2 = torch.rand(1024, 3, 64, 64)
-    out = swd(x1, x2, device="cuda")  # Fast estimation if device="cuda"
-    print(out)  # tensor(53.6950)
+
+import torch
+
+
+class SWDLoss(torch.nn.Module):
+    def __init__(self, batch_reduction='mean'):
+        super(SWDLoss, self).__init__()
+        self.batch_reduction = batch_reduction
+        self.name = 'SWD'
+
+    def forward(self, x, y):
+        return compute_swd(x, y, no_grad_condition=False)

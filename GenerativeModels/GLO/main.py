@@ -14,7 +14,7 @@ from losses.l2 import L2
 from losses.lap1_loss import LapLoss
 from losses.patch_mmd_loss import MMDApproximate
 from losses.patch_mmd_pp import MMD_PP
-from losses.vgg_loss.vgg_loss import VGGFeatures
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
 from GenerativeModels.utils.data_utils import get_dataset
 from GenerativeModels.GMMN.GMMN import GMMN
@@ -27,19 +27,21 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
 
-def train_GLO(dataset_name, train_name):
+def train_GLO(dataset_name, train_name, tag):
     glo_params = faces_config
-    train_dataset = get_dataset(dataset_name, split='test', resize=faces_config.img_dim)
+    train_dataset = get_dataset(dataset_name, split='train', resize=faces_config.img_dim)
 
     # define the generator
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
 
     # Define the loss criterion
-    criterion = VGGFeatures(pretrained=True)
+    # criterion = VGGPerceptualLoss(pretrained=True)
+    criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True)
+
     # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
     # criterion = MMD_PP(device, patch_size=5, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean', weights=[0.001, 0.05, 1.0])
 
-    outptus_dir = os.path.join('outputs', train_name, criterion.name)
+    outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     glo_trainer = GLOTrainer(glo_params, generator, criterion, train_dataset, device)
     # glo_trainer._load_ckpt(outptus_dir)
     glo_trainer.train(outptus_dir, epochs=glo_params.num_epochs)
@@ -122,7 +124,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    # train_GLO('ffhq', "ffhq_128")
-    train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
-    train_latent_samplers(train_dir)
-    test_models(train_dir)
+    train_GLO('ffhq', "ffhq_64_5-epochs", '')
+    # train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
+    # train_latent_samplers(train_dir)
+    # test_models(train_dir)

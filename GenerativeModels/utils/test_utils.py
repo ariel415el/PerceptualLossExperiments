@@ -7,7 +7,7 @@ from tqdm import tqdm
 from GenerativeModels.utils.data_utils import get_dataloader
 from GenerativeModels.utils.fid_scroe.fid_score import calculate_frechet_distance
 from GenerativeModels.utils.fid_scroe.inception import InceptionV3
-from GenerativeModels.utils.swd import swd
+from GenerativeModels.utils.swd import compute_swd
 
 
 def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device):
@@ -94,6 +94,6 @@ def run_swd_tests(train_dir, generator, data_embeddings, train_dataset, test_dat
     f = open(os.path.join(train_dir, "SWD-scores.txt"), 'w')
     for k, data in data_dict.items():
         if k != 'test':
-            swd_score = swd(data_dict['test'].float(), data.float(), device='cuda')
+            swd_score = compute_swd(data_dict['test'].float(), data.float(), device='cuda')
             f.write(f"{k} vs test data FID: {swd_score:.2f}\n")
     f.close()

@@ -40,21 +40,36 @@ def laplacian_pyramid(img, kernel, max_levels=5):
 
 
 class LapLoss(nn.Module):
-    def __init__(self, max_levels=3, k_size=5, sigma=2.0, n_channels=3):
+    def __init__(self, max_levels=3, k_size=5, sigma=2.0, n_channels=3, batch_reduction='mean', weightening_mode=0, no_last_layer=False):
         super(LapLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = kernel_gauss(size=k_size, sigma=sigma, n_channels=n_channels)
-        self.name = f"Lap1_ML-{max_levels}"
+        self.name = f"Lap1(L-{max_levels},M-{weightening_mode},{'NL' if no_last_layer else ''})"
+        self.no_last_layer = no_last_layer
+        if batch_reduction == 'mean':
+            self.metric = F.l1_loss
+        else:
+            self.metric = lambda x,y: torch.abs(x-y).view(x.shape[0], -1).mean(1)
+        if weightening_mode == 0:
+            self.weight = lambda j: (2 ** (2 * j))
+        if weightening_mode == 1:
+            self.weight = lambda j: (2 ** (-2 * j))
+        if weightening_mode == 2:
+            self.weight = lambda j: (2 ** (2 * (max_levels - j)))
+        if weightening_mode == 3:
+            self.weight = lambda j: 1
 
     def forward(self, output, target):
         self._gauss_kernel = self._gauss_kernel.to(output.device)
         pyramid_output = laplacian_pyramid(output, self._gauss_kernel, self.max_levels)
         pyramid_target = laplacian_pyramid(target, self._gauss_kernel, self.max_levels)
-        lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
-        # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (2 * j)) for j, (a, b) in enumerate(zip(pyramid_output[::-1], pyramid_target[::-1])))
-        # lap1_loss = sum(F.l1_loss(a, b)*(2 ** (-2 * j)) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
-        # lap1_loss = sum(F.l1_loss(a, b) for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)))
-        l2_loss = nn.MSELoss()(output, target)
+        if self.no_last_layer:
+            pyramid_target = pyramid_target[:-1]
+            pyramid_output = pyramid_output[:-1]
+        lap1_loss = 0
+        for j, (a, b) in enumerate(zip(pyramid_output, pyramid_target)):
+            lap1_loss += self.metric(a,b) * self.weight(j)
+        l2_loss = self.metric(output, target)
 
         return lap1_loss + l2_loss
 

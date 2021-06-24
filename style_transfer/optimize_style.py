@@ -8,7 +8,7 @@ from style_transfer.utils import imload, imsave, calc_loss, calc_TV_Loss
 from tqdm import tqdm
 
 
-def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, save_path, device):
+def style_mix_optimization(content_img_path, style_img_path, loss_network, style_weight, lr, max_iter, save_path, device):
     """
     Optimize an input image that mix style and content of specific two other images
     """
@@ -45,8 +45,9 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, lr, m
         content_loss = calc_loss(content_activations, target_content_activations, get_features_metric('l2'))
         style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('gram'))
 
-        total_loss = content_loss + style_loss * 30 + calc_TV_Loss(target_img)
+        total_loss = content_loss + style_loss * style_weight # + calc_TV_Loss(target_img)
 
+        # target_img.data.clamp_(-1, 1)
         optimizer.zero_grad()
         total_loss.backward(retain_graph=True)
         optimizer.step()
@@ -62,26 +63,27 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = torch.device("cpu")
     max_iter = 1000
-    lr = 0.5
+    lr = 1
     batch_size = 1
     img_size = 256
     crop_size = 240
+    style_weight = 30
     content_layers = ['conv3_3']
-    style_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3']
-    # content_layers = ['conv4_2']
-    # style_layers = ['conv3_2', 'conv4_2']
+    style_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+    # style_weight = 1000000
+    # content_layers = ['conv2_2']
+    # style_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1']
 
-    # import torchvision
-    # loss_network = torchvision.models.__dict__['vgg16'](pretrained=True).features.to(device)
 
     # loss_network = VGGFeatures(pretrained=False, reinit=True, norm_first_conv=True).to(device)
-    loss_network = VGGFeatures(pretrained=False, norm_first_conv=True).to(device)
+    loss_network = VGGFeatures(pretrained=True).to(device).eval()
     # loss_network = VGGFeatures(pretrained=False).to(device)
     # loss_network = VGGFeatures(pretrained=True).to(device)
 
-    train_dir = f"outputs/optimize_output_new/abstract-cornel-{loss_network.name}"
-    style_img_path = 'imgs/style/abstraction.jpg'
-    # style_img_path = 'imgs/faces/00001.png'
-    # content_img_path = 'imgs/faces/00006.png'
-    content_img_path = 'imgs/content/cornell.jpg'
-    style_mix_optimization(content_img_path, style_img_path, loss_network, lr, max_iter, train_dir, device)
+    tag = 'layer_weights'
+    style_img_path = 'imgs/style/starry_night.jpg'
+    style_img_name = os.path.splitext(os.path.basename(style_img_path))[0]
+    content_img_path = 'imgs/content/chicago.jpg'
+    content_img_name = os.path.splitext(os.path.basename(content_img_path))[0]
+    train_dir = f"outputs/optimize_output_new/{content_img_name}-{style_img_name}-{loss_network.name}-{tag}"
+    style_mix_optimization(content_img_path, style_img_path, loss_network, style_weight, lr, max_iter, train_dir, device)

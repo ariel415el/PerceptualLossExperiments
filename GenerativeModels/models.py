@@ -25,6 +25,7 @@ class DCGANGenerator(nn.Module):
             padding = [0, 1, 1, 1, 1]
         elif output_img_dim == 128:
             layer_depths = [input_dim, 512, 512, 256, 128, 64]
+            # layer_depths = [input_dim, 64, 64, 64, 64, 64]
             kernel_dim = [4, 4, 4, 4, 4, 4]
             strides = [1, 2, 2, 2, 2, 2]
             padding = [0, 1, 1, 1, 1, 1]
@@ -43,6 +44,7 @@ class DCGANGenerator(nn.Module):
             nn.Tanh()
         ]
         self.network = nn.Sequential(*layers)
+        print("DC generator params: ", sum(p.numel() for p in self.parameters() if p.requires_grad))
 
     def forward(self, input):
         input = input.view(input.size(0), input.size(1), 1, 1)
@@ -57,6 +59,7 @@ class DCGANEncoder(nn.Module):
             layer_depth = [channels, 64, 128, 256, 512]
         elif input_img_dim == 128:
             layer_depth = [channels, 64, 128, 256, 512, 512]
+            # layer_depth = [channels, 64, 64, 64, 64, 64]
         else:
             raise ValueError("Image dim supports only 28, 64, 128")
         layers = []
@@ -68,6 +71,7 @@ class DCGANEncoder(nn.Module):
             ]
         layers.append(nn.Conv2d(layer_depth[-1], output_latent_dim, 4, 1, 0, bias=False))
         self.convs = nn.Sequential(*layers)
+        print("DC encoder params: ", sum(p.numel() for p in self.parameters() if p.requires_grad))
 
     def forward(self, input):
         input = input

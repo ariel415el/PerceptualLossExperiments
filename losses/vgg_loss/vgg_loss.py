@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import transforms
 
+from losses.vgg_loss.blur_pool import MaxBlurPool
 from losses.vgg_loss.contextual_loss import contextual_loss
 from losses.vgg_loss.gram_loss import gram_loss, gram_trace_loss
 
@@ -49,6 +50,7 @@ class VGGFeatures(nn.Module):
         for v in cfg:
             if v == 'M':
                 features += [nn.MaxPool2d(kernel_size=2, stride=2)]
+                # features += [MaxBlurPool(in_channels)]
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=(3, 3), padding=1)
                 features += [conv2d, nn.ReLU(inplace=True)]
@@ -69,13 +71,14 @@ class VGGFeatures(nn.Module):
         i = 0
         for feat in self.features:
             if type(feat) == torch.nn.Conv2d:
-                # torch.nn.init.kaiming_normal_(feat.weight)
+                torch.nn.init.kaiming_normal_(feat.weight)
                 # torch.nn.init.normal_(feat.weight, 0, 0.015)
-                torch.nn.init.uniform_(feat.weight, -0.1, 0.1)
+                # torch.nn.init.uniform_(feat.weight, -0.1, 0.1)
                 if i == 0 and self.norm_first_conv:
                     i += 1
                     feat.weight.data -= torch.mean(feat.weight.data, dim=(2, 3), keepdim=True)
-                torch.nn.init.constant_(feat.bias, 0.5)
+                torch.nn.init.constant_(feat.bias, 0.0)
+                # torch.nn.init.constant_(feat.bias, 0.5)
 
     def get_activations(self, z, normalize=False):
         if normalize:
@@ -91,7 +94,7 @@ class VGGFeatures(nn.Module):
 
 class VGGPerceptualLoss(nn.Module):
     def __init__(self, layers_and_weights=None, pretrained=False, reinit=False, norm_first_conv=False,
-                 features_metric_name='l2'):
+                 features_metric_name='l1', batch_reduction='mean'):
         super(VGGPerceptualLoss, self).__init__()
         assert not (reinit and pretrained), "better not reinit pretrained weights"
         self.VGGFeatures = VGGFeatures(pretrained, norm_first_conv)
@@ -103,7 +106,7 @@ class VGGPerceptualLoss(nn.Module):
         else:
             self.layers_and_weights = [('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0),
                                        ('conv5_3', 1.0)]
-
+        self.batch_reduction = batch_reduction
         self.name = f"VGG({'_reinit' if reinit else ''}{'_NormFC' if norm_first_conv else ''}{'_PT' if pretrained else ''}_M-{features_metric_name})"
 
     def forward(self, x, y):
@@ -117,7 +120,10 @@ class VGGPerceptualLoss(nn.Module):
         for layer_name, w in self.layers_and_weights:
             loss += self.features_metric(fx[layer_name], fy[layer_name]) * w
 
-        return loss
+        if self.batch_reduction == 'mean':
+            return loss.mean()
+        else:
+            return loss
 
 
 if __name__ == '__main__':
