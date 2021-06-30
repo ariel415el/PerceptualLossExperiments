@@ -4,12 +4,11 @@ import torch
 
 from dataset import get_dataloader
 
-from losses.ScnnLoss_ariel import SCNNNetwork
-from losses.lap1_loss import LapLoss
 # from losses.mmd_exact_loss import MMDExact
-from losses.mmd_loss import MMDApproximate
-from losses.patch_loss import PatchRBFLoss, PatchRBFLaplacianLoss
-from losses.vgg_loss.vgg_loss import VGGFeatures
+from losses.laplacian_losses import LaplacyanLoss
+from losses.swd.lap_swd_loss import LapSWDLoss
+from losses.swd.swd import PatchSWDLoss
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -56,25 +55,42 @@ def score_2afc_dataset(data_loader, func, name=''):
 
 
 def main():
-    # criterion = VGGFeatures(5, pretrained=True).to(device)
-    # criterion = SCNNNetwork().to(device)
-    criterion = MMDApproximate(batch_reduction='none', normalize_patch='channel_mean', pool_size=32, pool_strides=16).to(device)
-    # criterion = MMDExact(batch_reduction='none').to(device)
-    # criterion = LapLoss(max_levels=5, n_channels=3).to(device)
-    # criterion = mse_looss
-    # criterion = PatchRBFLaplacianLoss(patch_size=3, batch_reduction='none', normalize_patch='none', ignore_patch_norm=False).to(device)
+    criterions = [
+        # L1(batch_reduction='none'),
+        # L2(batch_reduction='none'),
+        # LapLoss(max_levels=3, batch_reduction='none'),
+        # LapLoss(max_levels=3, no_last_layer=True, batch_reduction='none'),
+        # PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none'),
+        # MMD_PP(r=256, batch_reduction='none'),
+        # MMD_PPP(r=256, batch_reduction='none'),
+        # MMDApproximate(normalize_patch='channel_mean', batch_reduction='none'),
+        # MMDExact(batch_reduction='none'),
+        # VGGPerceptualLoss(pretrained=True, batch_reduction='none', features_metric_name='cx'),
+        # VGGPerceptualLoss(pretrained=True, batch_reduction='none', features_metric_name='swd'),
+        # VGGPerceptualLoss(pretrained=True, batch_reduction='none'),
+        # VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True, batch_reduction='none'),
+        # LapSWDLoss(batch_reduction='none'),
+        # LapPatchSWDLoss(batch_reduction='none'),
+        LaplacyanLoss(PatchSWDLoss(batch_reduction='none', num_proj=512, n_samples=None), weightening_mode=3, max_levels=2)
+        # PatchSWDLoss(batch_reduction='none')
+    ]
 
-    dataloader = get_dataloader(["../../../data/Perceptual2AFC/2afc/val/cnn",
-                                 "../../../data/Perceptual2AFC/2afc/val/traditional"],
-                                batch_size=32,
-                                num_workers=4)
+    dataloader = get_dataloader([
+                                "../../../data/Perceptual2AFC/2afc/val/cnn",
+                                 "../../../data/Perceptual2AFC/2afc/val/traditional"
+                                ],
+                                batch_size=8,
+                                num_workers=0)
 
-    scores = []
-    for i in range(3):
-        scores.append(score_2afc_dataset(dataloader, criterion))
-        print(scores[-1])
-    print(np.mean(scores), np.var(scores))
-
+    f = open("results.txt", 'a')
+    f.write(f"criterion: mean/std\n")
+    for criterion in criterions:
+        scores = []
+        for i in range(1):
+            scores.append(score_2afc_dataset(dataloader, criterion.to(device)))
+        f.write(f"{criterion.name}: {np.mean(scores):.2f}/{np.var(scores):.2f}\n")
+        print(f"{criterion.name}: {np.mean(scores):.2f}/{np.var(scores):.2f}")
+    f.close()
 
 if __name__ == '__main__':
     main()

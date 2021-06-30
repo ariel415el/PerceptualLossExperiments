@@ -53,7 +53,7 @@ def contextual_loss_2(x, y, h=0.5):
 
 
 
-def contextual_loss(x,y, h=0.5,loss_type='cosine'):
+def contextual_loss(x,y, h=0.5, loss_type='cosine'):
 
     while x.shape[2] * x.shape[3] >= 128 ** 2:
         x = F.avg_pool2d(x, 2)
@@ -75,7 +75,7 @@ def contextual_loss(x,y, h=0.5,loss_type='cosine'):
     dist_tilde = compute_relative_distance(dist_raw)
     cx = compute_cx(dist_tilde, h)
     cx = torch.mean(torch.max(cx, dim=1)[0], dim=1)  # Eq(1)
-    cx_loss = torch.mean(-torch.log(cx + 1e-5))  # Eq(5)
+    cx_loss = -torch.log(cx + 1e-5)  # Eq(5)
 
     return cx_loss
 

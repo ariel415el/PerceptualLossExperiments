@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 
 from losses.l2 import L2
 from losses.patch_loss import PatchRBFLoss

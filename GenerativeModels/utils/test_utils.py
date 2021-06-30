@@ -7,7 +7,7 @@ from tqdm import tqdm
 from GenerativeModels.utils.data_utils import get_dataloader
 from GenerativeModels.utils.fid_scroe.fid_score import calculate_frechet_distance
 from GenerativeModels.utils.fid_scroe.inception import InceptionV3
-from GenerativeModels.utils.swd import compute_swd
+from losses.swd.swd import compute_swd
 
 
 def run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device):

@@ -79,13 +79,13 @@ def plot_gram_matrix(image, layer_name, loss_network, save_path):
 def run_batch_experiments():
     train_dir = 'outputs/layer_analysis_gram_trace'
     images = [
-        # 'imgs/faces/00001.png',
+        'imgs/faces/00001.png',
         # 'imgs/content/chicago.jpg',
         # 'imgs/style/Muse.jpg',
         'imgs/style/starry_night.jpg',
         # 'imgs/style/candy.jpg',
         # 'imgs/style/yellow_sunset.jpg',
-        'imgs/style/abstraction.jpg'
+        # 'imgs/style/abstraction.jpg'
     ]
 
     losses = [

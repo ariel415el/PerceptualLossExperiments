@@ -1,14 +1,17 @@
-L2: 0.674
-VGG16-5-trained (x10): 0.727
-VGG16-4-trained (x10): 0.747
-VGG16-4-untrained: 0.682
-VGG16-4-initialized: 0.691
-VGG16-4-initialized-zero_mean: 0.692
-VGG16-4-initialized-zero_mean_first_only (x10): 0.736
-SCNN-radom-initialized (x2): 0.724
-Lap1-loss-5layers (x10): 0.671
-approximate_mmd_no-normalize: 0.688
-approximate_mmd_mean: 0.704
-approximate_mmd_channel-mean: 0.763
-approximate_mmd_channel-mean (16x8): 0.757
-PatchRBFLaplacianLoss_channel-mean (16x8): 0.70
+criterion:                                   mean/std
+L1:                                          0.68/0.0
+L2:                                          0.67/0.0
+Lap1(L-3,M-0,):                              0.63/0.0
+Lap1(L-3,M-0,NL):                            0.68/1.23e-32
+PatchLoss(p=11,s=0.02):                      0.68/0.0
+MMD++:                                       0.74/3.03e-08
+MMD+++:                                      0.71/5.097e-08
+MMD-Approx(p=3,win=32,ws=16,rf=1024,s=0.06): 0.76/9.94e-08
+LapSWD:                                      0.73/3.79e-07
+VGG(_PT_M-l1):                               0.72/0.0
+VGG(_reinit_NormFC_M-l1):                    0.72/7.79e-07
+VGG(_PT_M-l2):                               0.72/0.0
+VGG(_PT_M-gram):                             0.79/0.0
+VGG(_PT_M-gram_trace):                       0.79/0.0
+VGG(_PT_M-cx):                               0.80/0.00
+VGG(_PT_M-swd):                              0.77/0.00

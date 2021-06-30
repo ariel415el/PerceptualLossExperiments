@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import transforms
 
+from losses.swd.swd import compute_swd
 from losses.vgg_loss.blur_pool import MaxBlurPool
 from losses.vgg_loss.contextual_loss import contextual_loss
 from losses.vgg_loss.gram_loss import gram_loss, gram_trace_loss
@@ -29,12 +30,23 @@ def get_features_metric(features_metric_name, **kwargs):
         return lambda x, y: ((x - y) ** 2).view(x.shape[0], -1).mean(1)
     elif features_metric_name == 'l1':
         return lambda x, y: torch.abs(x - y).view(x.shape[0], -1).mean(1)
+    elif features_metric_name == 'dot':
+        return lambda x, y: 1 - torch.bmm(x.view(x.shape[0], 1, -1), y.view(x.shape[0], -1, 1))  # TODO normalize
     elif features_metric_name == 'gram':
         return gram_loss
     elif features_metric_name == 'gram_trace':
         return gram_trace_loss
     elif features_metric_name == 'cx':
         return lambda x, y: contextual_loss(x, y, **kwargs)
+    elif features_metric_name == 'l1+gram':
+        return lambda x, y: gram_loss(x, y) * 0.5 + torch.abs(x - y).view(x.shape[0], -1).mean(1)
+    elif features_metric_name == 'swd':
+        def features_swd(x, y):
+            b, c, h, w = x.shape
+            x = x.view(b, h * w, c)
+            y = y.view(b, h * w, c)
+            return torch.stack([compute_swd(x[i], y[i], num_proj=5*c) for i in range(b)])
+        return features_swd
     else:
         raise ValueError(f"No such feature metric: {features_metric_name}")
 
@@ -104,7 +116,7 @@ class VGGPerceptualLoss(nn.Module):
         if layers_and_weights:
             self.layers_and_weights = layers_and_weights
         else:
-            self.layers_and_weights = [('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0),
+            self.layers_and_weights = [('pixels', 1.0), ('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0),
                                        ('conv5_3', 1.0)]
         self.batch_reduction = batch_reduction
         self.name = f"VGG({'_reinit' if reinit else ''}{'_NormFC' if norm_first_conv else ''}{'_PT' if pretrained else ''}_M-{features_metric_name})"
@@ -115,8 +127,10 @@ class VGGPerceptualLoss(nn.Module):
 
         fx = self.VGGFeatures.get_activations(x)
         fy = self.VGGFeatures.get_activations(y)
+        fx.update({"pixels": x})
+        fy.update({"pixels": y})
 
-        loss = self.features_metric(x, y)
+        loss = 0
         for layer_name, w in self.layers_and_weights:
             loss += self.features_metric(fx[layer_name], fy[layer_name]) * w
 

@@ -20,7 +20,6 @@ class PatchLoss(torch.nn.Module):
         nw = int(np.floor(((w + 2 * self.padding - 1 - (ps - 1)) / self.strides) + 1))
         return patches.view(bs, c, ps, ps, nh, nw)
 
-
     def __init__(self, patch_size, strides=1, scale=1., spatial_reduction='mean', batch_reduction='mean', pad_image=False, normalize_patch='none', ignore_patch_norm=False):
         super(PatchLoss, self).__init__()
         self.patch_size = (patch_size, patch_size) if type(patch_size) == int else patch_size
