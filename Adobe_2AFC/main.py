@@ -5,10 +5,9 @@ import torch
 from dataset import get_dataloader
 
 # from losses.mmd_exact_loss import MMDExact
-from losses.laplacian_losses import LaplacyanLoss
-from losses.swd.lap_swd_loss import LapSWDLoss
+from losses.composite_losses.laplacian_losses import LaplacyanLoss
+from losses.composite_losses.window_loss import WindowLoss
 from losses.swd.swd import PatchSWDLoss
-from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -71,6 +70,8 @@ def main():
         # VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True, batch_reduction='none'),
         # LapSWDLoss(batch_reduction='none'),
         # LapPatchSWDLoss(batch_reduction='none'),
+        WindowLoss(PatchSWDLoss(patch_size=3, num_proj=64, n_samples=None), batch_reduction='none', window_size=32, stride=8),
+        WindowLoss(PatchSWDLoss(patch_size=7, num_proj=64, n_samples=None), batch_reduction='none', window_size=32, stride=8),
         LaplacyanLoss(PatchSWDLoss(batch_reduction='none', num_proj=512, n_samples=None), weightening_mode=3, max_levels=2)
         # PatchSWDLoss(batch_reduction='none')
     ]
@@ -80,7 +81,7 @@ def main():
                                  "../../../data/Perceptual2AFC/2afc/val/traditional"
                                 ],
                                 batch_size=8,
-                                num_workers=0)
+                                num_workers=4)
 
     f = open("results.txt", 'a')
     f.write(f"criterion: mean/std\n")

@@ -18,7 +18,9 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, style
     style_image = imload(style_img_path, imsize=(img_size, img_size)).to(device)
 
     # target_img = torch.randn(content_image.shape).to(device).float() * 0.5
-    target_img = content_image.clone()
+    # target_img = content_image.clone()
+    target_img = torch.ones(style_image.shape).to(device) * torch.mean(style_image.clone(), dim=(2,3), keepdim=True) + torch.randn(content_image.shape).to(device).float() * 0.01
+    # target_img = torch.mean(content_image.clone(), dim=(2,3), keepdim=True)
     target_img.requires_grad_(True)
 
     optimizer = torch.optim.Adam([target_img], lr=lr)
@@ -43,9 +45,10 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, style
         # content_loss = calc_loss(content_activations, target_content_activations, get_features_metric('cx', h=0.2))
         # style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('cx', h=0.1))
         content_loss = calc_loss(content_activations, target_content_activations, get_features_metric('l2'))
+        # style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('swd'))
         style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('gram'))
 
-        total_loss = content_loss + style_loss * style_weight # + calc_TV_Loss(target_img)
+        total_loss = content_loss + style_loss# * style_weight # + calc_TV_Loss(target_img)
 
         # target_img.data.clamp_(-1, 1)
         optimizer.zero_grad()
@@ -63,13 +66,14 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = torch.device("cpu")
     max_iter = 1000
-    lr = 1
+    lr = 0.01
     batch_size = 1
     img_size = 256
     crop_size = 240
-    style_weight = 30
-    content_layers = ['conv3_3']
-    style_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+    style_weight = 1
+    content_layers = []
+    # style_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+    style_layers = ['conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3','conv5_1', 'conv5_2', 'conv5_3']
     # style_weight = 1000000
     # content_layers = ['conv2_2']
     # style_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1']
@@ -80,8 +84,8 @@ if __name__ == '__main__':
     # loss_network = VGGFeatures(pretrained=False).to(device)
     # loss_network = VGGFeatures(pretrained=True).to(device)
 
-    tag = 'layer_weights'
-    style_img_path = 'imgs/style/starry_night.jpg'
+    tag = 'swd'
+    style_img_path = 'imgs/style/green_waves.jpg'
     style_img_name = os.path.splitext(os.path.basename(style_img_path))[0]
     content_img_path = 'imgs/content/chicago.jpg'
     content_img_name = os.path.splitext(os.path.basename(content_img_path))[0]

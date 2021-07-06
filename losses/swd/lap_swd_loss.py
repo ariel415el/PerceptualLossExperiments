@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from losses.laplacian_losses import minibatch_laplacian_pyramid
+from losses.composite_losses.laplacian_losses import minibatch_laplacian_pyramid
 
 
 def extract_patches(pyramid_layer, slice_indices, slice_size=7, unfold_batch_size=128, device="cpu"):
@@ -93,7 +93,16 @@ class LapSWDLoss(torch.nn.Module):
     def __init__(self, batch_reduction='mean'):
         super(LapSWDLoss, self).__init__()
         self.batch_reduction = batch_reduction
-        self.name = 'SWD'
+        self.name = 'LapSWD'
+
+    def forward(self, x, y):
+        return compute_lap_swd(x, y, no_grad_condition=False)
+
+class LapSWDLoss_2(torch.nn.Module):
+    def __init__(self, batch_reduction='mean'):
+        super(LapSWDLoss_2, self).__init__()
+        self.batch_reduction = batch_reduction
+        self.name = 'LapSWD'
 
     def forward(self, x, y):
         return compute_lap_swd(x, y, no_grad_condition=False)

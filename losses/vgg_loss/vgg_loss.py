@@ -119,7 +119,7 @@ class VGGPerceptualLoss(nn.Module):
             self.layers_and_weights = [('pixels', 1.0), ('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0),
                                        ('conv5_3', 1.0)]
         self.batch_reduction = batch_reduction
-        self.name = f"VGG({'_reinit' if reinit else ''}{'_NormFC' if norm_first_conv else ''}{'_PT' if pretrained else ''}_M-{features_metric_name})"
+        self.name = f"VGG({'reinit_' if reinit else ''}{'NormFC_' if norm_first_conv else ''}{'PT_' if pretrained else ''}M-{features_metric_name})"
 
     def forward(self, x, y):
         if self.reinit:

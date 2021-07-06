@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 from torchvision import utils as vutils
 from tqdm import tqdm
 
-from Experiments.test_swd import test_swd
 from GenerativeModels import models
 from GenerativeModels.GLO.config import faces_config
 from GenerativeModels.models import weights_init
@@ -18,7 +17,7 @@ from losses.patch_mmd_pp import MMD_PP
 from losses.vgg_loss.vgg_loss import VGGFeatures, VGGPerceptualLoss
 
 
-def embedd_data(dataset, encoder, batch_size):
+def embedd_data(dataset, encoder, batch_size, device):
     """Batch encoding of entire dataset with a given encoder"""
     dataloader = get_dataloader(dataset, batch_size, device, drop_last=False, shuffle=False)
 
@@ -38,7 +37,7 @@ def save_batch(batch, dir):
         vutils.save_image(batch[i], os.path.join(dir, f"{i}.png"), normalize=True)
 
 
-def load_models(ckp_dir=None):
+def load_models(device, ckp_dir=None):
     params = faces_config
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim).to(device)
 
@@ -98,51 +97,6 @@ def generate_interpolations_to_nn(train_dataset, indices, outputs_dir, n_steps, 
                 plt.legend()
                 plt.savefig(os.path.join(outputs_dir, 'interpolations', f"interpolation_{i}-to-{j}_{loss.name}.png"))
                 plt.clf()
-
-
-def sample_latent_neighbors(outputs_dir):
-    """Find nearest latent neighbors of data samples and create sets of original/reconstructed similar images """
-    # Load models
-    encoder, generator = load_models('../GenerativeModels/Aotuencoders/outputs/ffhq_128/VGG-None_PT')
-    embeddings = embedd_data(train_dataset, encoder, params.batch_size)
-    for i in [1, 4, 6, 10]:
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"data_neighbors{i}"), exist_ok=True)
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"reconstructions{i}"), exist_ok=True)
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"latent_neighbors_gauss{i}"), exist_ok=True)
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"latent_neighbors_direction{i}"), exist_ok=True)
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"mean_latent_neighbors_gauss{i}"), exist_ok=True)
-        os.makedirs(os.path.join(outputs_dir, 'sampling', f"{i}", f"mean_latent_neighbors_direction{i}"), exist_ok=True)
-
-        dists = torch.norm(embeddings - embeddings[i], dim=1)
-        neighbor_indices = torch.argsort(dists)[:25]
-        neighbors = torch.from_numpy(np.array([train_dataset[x][1] for x in neighbor_indices]))
-        save_batch(neighbors, os.path.join(outputs_dir, 'sampling', f"{i}", f"data_neighbors{i}"))
-
-        neighbor_embeddings = embeddings[neighbor_indices]
-        reconstructions = generator(neighbor_embeddings)
-        save_batch(reconstructions, os.path.join(outputs_dir, 'sampling', f"{i}", f"reconstructions{i}"))
-
-        mean_embedding = embeddings[neighbor_indices].mean(0)
-        latent_code = embeddings[i]
-        latent_neighbors_gauss = [latent_code]
-        latent_neighbors_direction = [latent_code]
-        mean_latent_neighbors_gauss = [mean_embedding]
-        mean_latent_neighbors_direction = [mean_embedding]
-
-        coeff = 20
-        for j in range(1, 25):
-            latent_neighbors_gauss.append(latent_code + coeff * torch.randn(latent_code.shape).to(device))
-            latent_neighbors_direction.append((latent_code + neighbor_embeddings[j]) / 2)
-            mean_latent_neighbors_gauss.append(mean_embedding + coeff * torch.randn(mean_embedding.shape).to(device))
-            mean_latent_neighbors_direction.append((mean_embedding + neighbor_embeddings[j]) / 2)
-        save_batch(generator(torch.stack(latent_neighbors_gauss)),
-                   os.path.join(outputs_dir, 'sampling', f"{i}", f"latent_neighbors_gauss{i}"))
-        save_batch(generator(torch.stack(latent_neighbors_direction)),
-                   os.path.join(outputs_dir, 'sampling', f"{i}", f"latent_neighbors_direction{i}"))
-        save_batch(generator(torch.stack(mean_latent_neighbors_gauss)),
-                   os.path.join(outputs_dir, 'sampling', f"{i}", f"mean_latent_neighbors_gauss{i}"))
-        save_batch(generator(torch.stack(mean_latent_neighbors_direction)),
-                   os.path.join(outputs_dir, 'sampling', f"{i}", f"mean_latent_neighbors_direction{i}"))
 
 
 def analyze_perceptual_features_intencities():

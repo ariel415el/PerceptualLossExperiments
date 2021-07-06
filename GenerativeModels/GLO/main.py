@@ -8,9 +8,12 @@ from GenerativeModels.GLO.IMLE import IMLE
 from config import faces_config
 import sys
 
+from losses.composite_losses.list_loss import LossesList
+from losses.experimental_patch_losses import SWD_PPP
+
 sys.path.append(os.path.realpath("../.."))
 from losses.patch_loss import PatchRBFLoss
-from losses.l2 import L2
+from losses.l2 import L2, L1
 from losses.lap1_loss import LapLoss
 from losses.patch_mmd_loss import MMDApproximate
 from losses.patch_mmd_pp import MMD_PP
@@ -35,8 +38,14 @@ def train_GLO(dataset_name, train_name, tag):
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
 
     # Define the loss criterion
-    # criterion = VGGPerceptualLoss(pretrained=True)
-    criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True)
+    # criterion = L1()
+    # criterion = LapLoss(max_levels=3, no_last_layer=True)
+    # criterion = VGGPerceptualLoss(pretrained=True, features_metric_name='l1+gram')
+
+    criterion = SWD_PPP()
+
+    # criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True,
+    #             layers_and_weights=[('conv1_2', 0.1), ('conv2_2', 4.0), ('conv3_3', 8.0), ('conv4_3', 8.0),('conv5_3', 3.0)])
 
     # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
     # criterion = MMD_PP(device, patch_size=5, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean', weights=[0.001, 0.05, 1.0])
@@ -124,7 +133,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_GLO('ffhq', "ffhq_64_5-epochs", '')
+    train_GLO('ffhq', "ffhq_64", '')
     # train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

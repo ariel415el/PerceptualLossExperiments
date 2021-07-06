@@ -55,11 +55,11 @@ class PatchSWDLoss(torch.nn.Module):
         self.n_samples = n_samples
         self.num_proj = num_proj
         self.batch_reduction = batch_reduction
-        self.name = 'PatchSWD'
+        self.name = f"PatchSWD(p-{patch_size}-{stride})"
 
     def forward(self, x, y):
         results = compute_patch_swd(x, y, patch_size=self.patch_size, stride=self.stride, n_samples=self.n_samples, num_proj=self.num_proj)
-
+        # results *= 1e3
         if self.batch_reduction == 'mean':
             return results.mean()
         else:

@@ -13,7 +13,10 @@
 /style_transfer/outputs
 /style_transfer/imgs
 /perceptual_mean_optimization/clusters
+/perceptual_mean_optimization/single_outputs
 /perceptual_mean_optimization/outputs
 /Experiments/compare_trained_generators_losses_outputs
 /Experiments/trained_models
 /Experiments/test_swd
+/Experiments/latent_neighbors_sets
+/Experiments/style_synthesis

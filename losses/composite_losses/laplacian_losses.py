@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch import nn
 
+
 ######## Method 1 ###########
 def get_kernel_gauss(size=5, sigma=1.0, n_channels=1):
     if size % 2 != 1:
@@ -110,14 +111,15 @@ def minibatch_laplacian_pyramid(image, n_pyramids, batch_size, device="cpu"):
 
 
 class LaplacyanLoss(nn.Module):
-    def __init__(self, metric, max_levels=3, k_size=5, sigma=2.0, weightening_mode=0):
+    def __init__(self, metric, max_levels=3, k_size=5, sigma=1.0, weightening_mode=0):
         super(LaplacyanLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = get_kernel_gauss(size=k_size, sigma=sigma, n_channels=3)
+        # self._gauss_kernel = get_gaussian_kernel_2(device=torch.device('cuda')).repeat(3,1,1,1)
 
         self.metric = metric
 
-        self.name = f"Laplacian-{self.metric.name}(L-{max_levels},M-{weightening_mode})"
+        self.name = f"Laplacian(L-{max_levels},M-{weightening_mode})-{self.metric.name}"
 
         if weightening_mode == 0:
             self.weight = lambda j: (2 ** (2 * j))
@@ -140,19 +142,26 @@ class LaplacyanLoss(nn.Module):
         return lap1_loss
 
 
+
 if __name__ == '__main__':
-    x = torch.ones((5,3,128,128))
+    k1 = get_gaussian_kernel_2()
+    k2 = get_kernel_gauss(size=5, sigma=2, n_channels=3)
+
+    x = torch.ones((5, 3, 128, 128))
     import cv2
-    x = cv2.imread('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/content/green_eye.jpg')
-    x = cv2.resize(x, (256,256)).transpose(2,0,1)
+
+    x = cv2.imread(
+        '/style_transfer/imgs/content/green_eye.jpg')
+    x = cv2.resize(x, (256, 256)).transpose(2, 0, 1)
     print(x.shape)
     x = torch.from_numpy(x).unsqueeze(0).float()
     print(x.shape)
-    z = laplacian_pyramid(x, get_kernel_gauss(size=7, sigma=3,n_channels=3), 5)
+    z = laplacian_pyramid(x, get_kernel_gauss(size=7, sigma=3, n_channels=3), 5)
     w = laplacian_pyramid_2(x, 5, device="cpu")
 
-    for n,(i,j) in enumerate(zip(z,w)):
+    for n, (i, j) in enumerate(zip(z, w)):
         from torchvision.utils import save_image
+
         save_image(i, f"i-{n}.png", normalize=True)
         save_image(j, f"j-{n}.png", normalize=True)
         # print(torch.all(i == j))
