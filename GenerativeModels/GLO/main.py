@@ -5,22 +5,14 @@ import torch.utils.data
 import torchvision.utils as vutils
 
 from GenerativeModels.GLO.IMLE import IMLE
-from config import faces_config
+from GenerativeModels.config import default_config
 import sys
 
-from losses.composite_losses.list_loss import LossesList
-from losses.experimental_patch_losses import SWD_PPP
+from losses.experimental_patch_losses import MMD_PP
 
 sys.path.append(os.path.realpath("../.."))
-from losses.patch_loss import PatchRBFLoss
-from losses.l2 import L2, L1
-from losses.lap1_loss import LapLoss
-from losses.patch_mmd_loss import MMDApproximate
-from losses.patch_mmd_pp import MMD_PP
-from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
 from GenerativeModels.utils.data_utils import get_dataset
-from GenerativeModels.GMMN.GMMN import GMMN
 from GLO import GLOTrainer
 from GenerativeModels import models
 
@@ -31,8 +23,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train_GLO(dataset_name, train_name, tag):
-    glo_params = faces_config
-    train_dataset = get_dataset(dataset_name, split='train', resize=faces_config.img_dim)
+    glo_params = default_config
+    train_dataset = get_dataset(dataset_name, split='train', resize=default_config.img_dim)
 
     # define the generator
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
@@ -42,7 +34,10 @@ def train_GLO(dataset_name, train_name, tag):
     # criterion = LapLoss(max_levels=3, no_last_layer=True)
     # criterion = VGGPerceptualLoss(pretrained=True, features_metric_name='l1+gram')
 
-    criterion = SWD_PPP()
+    # criterion = SWD_PPP()
+    # criterion = PatchRBFLoss(patch_size=19, sigma=0.01, pad_image=True)
+    # criterion = LaplacyanLoss(PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True), weightening_mode=3, max_levels=2)
+    criterion = MMD_PP(r=128)
 
     # criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True,
     #             layers_and_weights=[('conv1_2', 0.1), ('conv2_2', 4.0), ('conv3_3', 8.0), ('conv4_3', 8.0),('conv5_3', 3.0)])
@@ -73,7 +68,7 @@ def train_latent_samplers(train_dir):
 
 
 def test_models(train_dir):
-    glo_params = faces_config
+    glo_params = default_config
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim).to(device)
     imle_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
     # gmmn_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
@@ -116,7 +111,7 @@ def plot_GLO_variance():
     import numpy as np
     full_data = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/april_25/dummy'
     partial_data = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/april_25/pretrained-1000_examples_random_unit_normed'
-    glo_params = faces_config
+    glo_params = default_config
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim).to(device)
     for dir_name, name in [(full_data, "full"), (partial_data, "partial")]:
         generator.load_state_dict(torch.load(os.path.join(dir_name, 'generator.pth'), map_location=device))
@@ -133,7 +128,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_GLO('ffhq', "ffhq_64", '')
+    train_GLO('ffhq', "ffhq_128", '')
     # train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

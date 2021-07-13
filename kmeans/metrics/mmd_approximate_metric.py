@@ -4,7 +4,7 @@ import numpy as np
 import os
 import sys
 sys.path.append(os.path.realpath(".."))
-from losses.mmd_loss import MMDApproximate
+from losses.mmd.mmd_loss import MMDApproximate
 
 
 class MMDpace:

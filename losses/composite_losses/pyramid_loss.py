@@ -8,8 +8,8 @@ def get_gaussian_pyramid(img, max_levels=5):
 
     for level in range(max_levels):
         current = F.avg_pool2d(current, 2)
+        pyramid.append(current)
 
-    pyramid.append(current)
     return pyramid
 
 
@@ -18,7 +18,7 @@ class PyramidLoss(nn.Module):
         super(PyramidLoss, self).__init__()
         self.max_levels = max_levels
         self.metric = metric
-        self.name = f"Pyramid(L-{max_levels}-{self.metric.name})"
+        self.name = f"Pyramid(L-{max_levels},M-{weightening_mode})-{self.metric.name}"
 
         if weightening_mode == 0:
             self.weight = lambda j: (2 ** (2 * j))

@@ -1,7 +1,7 @@
 ##### Taken from https://github.com/koshian2/swd-pytorch #####
 
 import numpy as np
-
+import torch
 from losses.composite_losses.laplacian_losses import minibatch_laplacian_pyramid
 
 
@@ -84,25 +84,3 @@ def compute_lap_swd(image1, image2,
             return result.cpu()
         else:
             return torch.mean(result).cpu()
-
-
-import torch
-
-
-class LapSWDLoss(torch.nn.Module):
-    def __init__(self, batch_reduction='mean'):
-        super(LapSWDLoss, self).__init__()
-        self.batch_reduction = batch_reduction
-        self.name = 'LapSWD'
-
-    def forward(self, x, y):
-        return compute_lap_swd(x, y, no_grad_condition=False)
-
-class LapSWDLoss_2(torch.nn.Module):
-    def __init__(self, batch_reduction='mean'):
-        super(LapSWDLoss_2, self).__init__()
-        self.batch_reduction = batch_reduction
-        self.name = 'LapSWD'
-
-    def forward(self, x, y):
-        return compute_lap_swd(x, y, no_grad_condition=False)

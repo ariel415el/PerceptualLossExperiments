@@ -15,5 +15,5 @@ VGG(_PT_M-l2):                               0.72/0.0
 VGG(_PT_M-gram):                             0.79/0.0
 VGG(_PT_M-gram_trace):                       0.79/0.0
 VGG(_PT_M-cx):                               0.80/0.00
-VGG(_PT_M-swd):                              0.77/0.00criterion: mean/std
-Windowed(w-32-8)-PatchSWD(p-3-1): 0.72/0.00
+VGG(_PT_M-swd):                              0.77/0.00
+Windowed(w-32-8)-PatchSWD(p-3-1):            0.72/0.00

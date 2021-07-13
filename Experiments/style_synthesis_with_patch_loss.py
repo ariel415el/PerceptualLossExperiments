@@ -10,18 +10,14 @@ import torchvision.utils as vutils
 import sys
 
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
-from losses.composite_losses.pyramid_loss import PyramidLoss
-from losses.patch_mmd_loss import MMDApproximate
-from losses.patch_mmd_pp import MMD_PP
-from losses.swd.lap_swd_loss import compute_lap_swd
-from losses.experimental_patch_losses import MMD_PPP
 from losses.composite_losses.list_loss import LossesList
+from losses.composite_losses.pyramid_loss import PyramidLoss
 from losses.composite_losses.window_loss import WindowLoss
-from losses.swd.swd import PatchSWDLoss
+from losses.swd.patch_swd import PatchSWDLoss
+
+from losses.mmd.patch_mmd import PatchMMDLoss
 
 sys.path.append(os.path.realpath(".."))
-from losses.patch_loss import PatchRBFLoss
-from losses.l2 import L2
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -51,9 +47,9 @@ def pt2cv(img):
 
 def comupute_loss(criteria, x, x_squared):
     s = x.shape[2]
-    unfold = torch.nn.Unfold(kernel_size=s, stride=s//2)
-    windows = unfold(x_squared)[0].transpose(0,1).reshape(-1, 3, s, s)
-    return criteria(x.repeat(windows.shape[0],1,1,1), windows).mean()
+    unfold = torch.nn.Unfold(kernel_size=s, stride=s // 2)
+    windows = unfold(x_squared)[0].transpose(0, 1).reshape(-1, 3, s, s)
+    return criteria(x.repeat(windows.shape[0], 1, 1, 1), windows).mean()
 
 
 def optimize_texture(target_texture, criteria, output_dir=None, num_steps=400, lr=0.003):
@@ -62,7 +58,7 @@ def optimize_texture(target_texture, criteria, output_dir=None, num_steps=400, l
     """
     s = target_texture.shape[2]
     assert s == target_texture.shape[3]
-    optimized_variable = torch.ones((1, 3, 2*s, 2*s)).to(device) * \
+    optimized_variable = torch.ones((1, 3, 2 * s, 2 * s)).to(device) * \
                          torch.mean(target_texture, dim=(0, 2, 3), keepdim=True)
     optimized_variable += torch.randn(optimized_variable.shape).to(device).clamp(-1, 1) * 0.1
 
@@ -77,15 +73,16 @@ def optimize_texture(target_texture, criteria, output_dir=None, num_steps=400, l
 
         optim.zero_grad()
 
-        loss = comupute_loss(criteria, target_texture, optimized_variable)  # + calc_TV_Loss(optimized_variable.unsqueeze(0))
+        # loss = comupute_loss(criteria, target_texture, optimized_variable)  # + calc_TV_Loss(optimized_variable.unsqueeze(0))
+        loss = criteria(target_texture, optimized_variable)
 
         loss.backward()
         optim.step()
         losses.append(loss.item())
 
-        if i % 200 == 0:
-            for g in optim.param_groups:
-                g['lr'] *= 0.5
+        # if i % 200 == 0:
+        #     for g in optim.param_groups:
+        #         g['lr'] *= 0.5
         if i % 100 == 0 and output_dir is not None:
             fig1 = plt.figure()
             ax = fig1.add_subplot(111)
@@ -98,36 +95,31 @@ def optimize_texture(target_texture, criteria, output_dir=None, num_steps=400, l
 
     return optimized_image
 
-def crop_center(img,cropx,cropy):
-    y,x,c = img.shape
-    startx = x//2-(cropx//2)
-    starty = y//2-(cropy//2)
-    return img[starty:starty+cropy, startx:startx+cropx]
+
+def crop_center(img, cropx, cropy):
+    y, x, c = img.shape
+    startx = x // 2 - (cropx // 2)
+    starty = y // 2 - (cropy // 2)
+    return img[starty:starty + cropy, startx:startx + cropx]
+
 
 def run_sigle():
-
     images = [
         '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/green_waves.jpg',
-        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/Water.jpg',
-        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/soil.jpeg',
+        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/cobbles.jpeg',
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/soil.jpeg',
     ]
 
     losses = [
-        MMDApproximate(patch_size=3, pool_size=32, pool_strides=8, r=64, sigma=0.06, normalize_patch='channel_mean'),
-        MMD_PPP(),
-        PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True),
-        LossesList([
-            L2(batch_reduction='none'),
-            PatchRBFLoss(patch_size=3, sigma=0.06, pad_image=True, batch_reduction='none'),
-            PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none'),
-            WindowLoss(PatchSWDLoss(patch_size=3, num_proj=128, n_samples=256), batch_reduction='none')
-        ], weights=[0.01, 1, 1, 0.6], name='SWD+++(p=3)'),
-        LossesList([
-            L2(batch_reduction='none'),
-            PatchRBFLoss(patch_size=3, sigma=0.06, pad_image=True, batch_reduction='none'),
-            PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none'),
-            WindowLoss(PatchSWDLoss(patch_size=7, num_proj=128, n_samples=256), batch_reduction='none')
-        ], weights=[0.01, 1, 1, 0.6], name='SWD+++(p=7)'),
+        # PatchSWDLoss(patch_size=9, num_proj=256, n_samples=2048),
+        # PatchMMDLoss(patch_size=9, n_samples=2048)
+        # LaplacyanLoss(PatchMMDLoss(patch_size=15, n_samples=512), weightening_mode=3, max_levels=2),
+        # PatchMMDLoss(patch_size=7, n_samples=1024),
+        # PatchSWDLoss(patch_size=19, n_samples=4096),
+        # LaplacyanLoss(PatchMMDLoss(patch_size=19, n_samples=1024), weightening_mode=3, max_levels=2),
+        WindowLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), window_size=32, stride=16),
+        PyramidLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), weightening_mode=3, max_levels=3),
+        LaplacyanLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), weightening_mode=3, max_levels=3)
     ]
     s = 128
     for path in images:
@@ -145,7 +137,7 @@ def run_sigle():
             os.makedirs(train_dir, exist_ok=True)
 
             texture_image = cv2pt(texture_image).unsqueeze(0).to(device)
-            img = optimize_texture(texture_image, loss, output_dir=train_dir, num_steps=1000, lr=0.1)
+            img = optimize_texture(texture_image, loss, output_dir=train_dir, num_steps=1000, lr=0.05)
             vutils.save_image(img, os.path.join(input_dir, f"{loss.name}.png"), normalize=True)
 
 

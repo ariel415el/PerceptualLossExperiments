@@ -20,3 +20,5 @@
 /Experiments/test_swd
 /Experiments/latent_neighbors_sets
 /Experiments/style_synthesis
+/Experiments/gradient_comparisons
+/Experiments/optimize_model

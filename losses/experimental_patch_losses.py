@@ -1,9 +1,8 @@
 from losses.composite_losses.window_loss import WindowLoss
-from losses.patch_mmd_loss import MMDApproximate
-from losses.lap1_loss import *
+from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.classic_losses.lap1_loss import *
 from losses.patch_loss import *
-from losses.swd.swd import PatchSWDLoss
-import torch.nn.functional as F
+from losses.swd.patch_swd import PatchSWDLoss
 
 
 def get_reduction_fn(reduction):
@@ -18,6 +17,30 @@ def get_reduction_fn(reduction):
         return no_reduce
     else:
         raise ValueError("Invalid reduction type")
+
+
+class MMD_PP(torch.nn.Module):
+    def __init__(self, patch_size=3, sigma=0.06, strides=1, r=512, pool_size=32, pool_strides=16
+                 , normalize_patch='channel_mean', pad_image=True, weights=None, batch_reduction='mean', local_patch_size=3, local_sigma=0.1) -> object:
+        super(MMD_PP, self).__init__()
+        if weights is None:
+            self.weights = [0.001, 0.05, 1.0]
+        else:
+            self.weights = weights
+
+        self.losses = torch.nn.ModuleList([
+            L2(batch_reduction=batch_reduction),
+            PatchRBFLoss(patch_size=local_patch_size, sigma=local_sigma, pad_image=pad_image, batch_reduction=batch_reduction),
+            MMDApproximate(patch_size=patch_size, sigma=sigma, strides=strides, r=r, pool_size=pool_size,
+                           pool_strides=pool_strides, batch_reduction=batch_reduction,
+                           normalize_patch=normalize_patch, pad_image=pad_image)
+        ])
+
+        # self.name = f"MMD++(p={patch_size},win={pool_size}:{pool_strides},rf={r},w={self.weights},s={sigma},ls={local_sigma},lp={local_patch_size})"
+        self.name = f"MMD++"
+
+    def forward(self, x, y):
+        return sum([self.losses[i](x, y) * self.weights[i] for i in range(len(self.losses))])
 
 
 class MMD_PPP(torch.nn.Module):
@@ -69,29 +92,3 @@ class SWD_PPP(torch.nn.Module):
         return sum([self.losses[i](x, y) * self.weights[i] for i in range(len(self.losses))])
 
 
-class GradLoss(torch.nn.Module):
-    def __init__(self, batch_reduction='mean'):
-        super(GradLoss, self).__init__()
-        self.ky = torch.tensor([[1, 1, 1], [0, 0, 0], [-1, -1, -1]], dtype=torch.float32).reshape(1, 1, 3, 3)
-        self.kx = torch.tensor([[1, 0, -1], [1, 0, -1], [1, 0, -1]], dtype=torch.float32).reshape(1, 1, 3, 3)
-        self.batch_reduction = batch_reduction
-        self.name = 'GradLoss'
-
-    def forward(self, im1, im2):
-        from torch.nn.functional import conv2d, pad
-
-        b = im1.size(0)
-        self.kx = self.kx.to(im1.device)
-        self.ky = self.ky.to(im1.device)
-        im1_gray = torch.mean(im1, 1, keepdim=True)
-        im2_gray = torch.mean(im2, 1, keepdim=True)
-        # im1_gray = pad(torch.mean(im1, 1, keepdim=True), (1, 1, 1, 1), mode='reflect')
-        # im2_gray = pad(torch.mean(im2, 1, keepdim=True), (1, 1, 1, 1), mode='reflect')
-        diff_x = F.l1_loss(conv2d(im1_gray, self.kx), conv2d(im2_gray, self.kx), reduction=self.batch_reduction)
-        diff_y = F.l1_loss(conv2d(im1_gray, self.ky), conv2d(im2_gray, self.ky), reduction=self.batch_reduction)
-
-        if self.batch_reduction == 'none':
-            diff_x = torch.mean(diff_x, (1,2,3))
-            diff_y = torch.mean(diff_y, (1,2,3))
-
-        return (diff_x + diff_y) / 2

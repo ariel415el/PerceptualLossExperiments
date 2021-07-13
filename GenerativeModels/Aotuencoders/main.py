@@ -9,17 +9,18 @@ import sys
 
 from GenerativeModels.models import weights_init
 from GenerativeModels.utils.test_utils import run_FID_tests, run_swd_tests
-from losses.experimental_patch_losses import MMD_PPP
-from losses.l2 import L2, L1
-from losses.lap1_loss import LapLoss
+from losses.classic_losses.l2 import L1
+from losses.composite_losses.laplacian_losses import LaplacyanLoss
+from losses.composite_losses.list_loss import LossesList
+from losses.experimental_patch_losses import MMD_PP
+from losses.classic_losses.grad_loss import GradLoss
+from losses.mmd.windowed_patch_mmd import MMDApproximate
 from losses.patch_loss import PatchRBFLoss
-from losses.patch_mmd_pp import MMD_PP
-from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 sys.path.append(os.path.realpath("../.."))
 from GenerativeModels.Aotuencoders.autoencoder import AutoEncoderTraniner
 from GenerativeModels.GLO.IMLE import IMLE
-from GenerativeModels.GLO.config import faces_config
+from GenerativeModels.config import default_config
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler
 from GenerativeModels.utils.data_utils import get_dataset, get_dataloader
 from GenerativeModels import models
@@ -31,39 +32,37 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def train_autoencoder(dataset_name, train_name, tag):
-    params = faces_config
-    train_dataset = get_dataset(dataset_name, split='train', resize=params.img_dim, val_percent=0.5)
+    params = default_config
+    train_dataset = get_dataset(dataset_name, split='train', resize=params.img_dim)
     print("Dataset size: ", len(train_dataset))
 
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
-    encoder.apply(weights_init)
+    # encoder.apply(weights_init)
+    encoder.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/encoder.pth'))
 
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim)
-    generator.apply(weights_init)
+    # generator.apply(weights_init)
+    generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/generator.pth'))
 
     # Define the loss criterion
     # criterion = L1()
-    # criterion = LapLoss()
-    # criterion = MMD_PPP(device, r=256, weights=[0.001, 0.05, 0.1, 1.0], batch_reduction='none')
-    # criterion = VGGPerceptualLoss(pretrained=True)
-    criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True)
-    # criterion = VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 0.562), ('conv2_2', 0.098), ('conv3_3', 0.031), ('conv4_3', 0.105), ('conv5_3', 0.904)])
-    # criterion = VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True)
-    # criterion = MMD_PPP(r=200)
-    # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
-    # criterion = MMD_PPP(r=512, device=device)
-    # criterion = MMD_PP(device, r=512)
-    # criterion = PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, device=device, batch_reduction='none')
+    # criterion = MMD_PP(r=64)
+    # criterion = LossesList([
+    #     L1(),
+    #     GradLoss()
+    # ], weights=[0.001,1])
+
+    criterion = MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=64, normalize_patch='channel_mean')
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
-    trainer = AutoEncoderTraniner(faces_config, encoder, generator, criterion, train_dataset, device)
+    trainer = AutoEncoderTraniner(default_config, encoder, generator, criterion, train_dataset, device)
     # trainer._load_ckpt(outptus_dir)
-    trainer.train(outptus_dir, epochs=faces_config.num_epochs)
+    trainer.train(outptus_dir, epochs=default_config.num_epochs)
 
 
 def train_latent_samplers(train_dir):
-    params = faces_config
+    params = default_config
 
     train_dataset = get_dataset('ffhq', split='train', resize=params.img_dim)
 
@@ -94,7 +93,7 @@ def embedd_data(dataset, encoder, batch_size):
 
 
 def evaluate_generator(outputs_dir):
-    params = faces_config
+    params = default_config
 
     # Load datasets
     train_dataset = get_dataset('ffhq', split='train', resize=params.img_dim)
@@ -132,7 +131,7 @@ def evaluate_generator(outputs_dir):
                   device)
 
 if __name__ == '__main__':
-    train_name = f"ffhq_128-5-epochs"
-    train_autoencoder('ffhq', train_name, 'blurPool')
+    train_name = f"ffhq_128_exp"
+    train_autoencoder('ffhq', train_name, '-from-l2')
     # train_latent_samplers('outputs/ffhq_128/VGG-None_PT')
     # evaluate_generator('outputs/test/VGG-None_PT')

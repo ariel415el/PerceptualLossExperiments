@@ -5,9 +5,7 @@ import torch
 from dataset import get_dataloader
 
 # from losses.mmd_exact_loss import MMDExact
-from losses.composite_losses.laplacian_losses import LaplacyanLoss
-from losses.composite_losses.window_loss import WindowLoss
-from losses.swd.swd import PatchSWDLoss
+from losses.mmd.patch_mmd_loss import MMDApproximate
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -55,25 +53,11 @@ def score_2afc_dataset(data_loader, func, name=''):
 
 def main():
     criterions = [
-        # L1(batch_reduction='none'),
-        # L2(batch_reduction='none'),
-        # LapLoss(max_levels=3, batch_reduction='none'),
-        # LapLoss(max_levels=3, no_last_layer=True, batch_reduction='none'),
-        # PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none'),
-        # MMD_PP(r=256, batch_reduction='none'),
-        # MMD_PPP(r=256, batch_reduction='none'),
-        # MMDApproximate(normalize_patch='channel_mean', batch_reduction='none'),
-        # MMDExact(batch_reduction='none'),
-        # VGGPerceptualLoss(pretrained=True, batch_reduction='none', features_metric_name='cx'),
-        # VGGPerceptualLoss(pretrained=True, batch_reduction='none', features_metric_name='swd'),
-        # VGGPerceptualLoss(pretrained=True, batch_reduction='none'),
-        # VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True, batch_reduction='none'),
-        # LapSWDLoss(batch_reduction='none'),
-        # LapPatchSWDLoss(batch_reduction='none'),
-        WindowLoss(PatchSWDLoss(patch_size=3, num_proj=64, n_samples=None), batch_reduction='none', window_size=32, stride=8),
-        WindowLoss(PatchSWDLoss(patch_size=7, num_proj=64, n_samples=None), batch_reduction='none', window_size=32, stride=8),
-        LaplacyanLoss(PatchSWDLoss(batch_reduction='none', num_proj=512, n_samples=None), weightening_mode=3, max_levels=2)
-        # PatchSWDLoss(batch_reduction='none')
+        # MMD_PP(batch_reduction='none'),
+        MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        MMDApproximate(patch_size=3, sigma=0.1, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=16, pool_strides=8, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=8, pool_strides=4, r=64, batch_reduction='none', normalize_patch='channel_mean'),
     ]
 
     dataloader = get_dataloader([
@@ -89,8 +73,8 @@ def main():
         scores = []
         for i in range(1):
             scores.append(score_2afc_dataset(dataloader, criterion.to(device)))
-        f.write(f"{criterion.name}: {np.mean(scores):.2f}/{np.var(scores):.2f}\n")
-        print(f"{criterion.name}: {np.mean(scores):.2f}/{np.var(scores):.2f}")
+        f.write(f"{criterion.name}: {np.mean(scores):.3f}/{np.var(scores):.2f}\n")
+        print(f"{criterion.name}: {np.mean(scores):.3f}/{np.var(scores):.2f}")
     f.close()
 
 if __name__ == '__main__':

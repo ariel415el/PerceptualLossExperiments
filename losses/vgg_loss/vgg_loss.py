@@ -1,13 +1,10 @@
 import os
 
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision.transforms import transforms
 
-from losses.swd.swd import compute_swd
-from losses.vgg_loss.blur_pool import MaxBlurPool
+from losses.swd.patch_swd import compute_swd
 from losses.vgg_loss.contextual_loss import contextual_loss
 from losses.vgg_loss.gram_loss import gram_loss, gram_trace_loss
 
@@ -45,7 +42,8 @@ def get_features_metric(features_metric_name, **kwargs):
             b, c, h, w = x.shape
             x = x.view(b, h * w, c)
             y = y.view(b, h * w, c)
-            return torch.stack([compute_swd(x[i], y[i], num_proj=5*c) for i in range(b)])
+            return torch.stack([compute_swd(x[i], y[i], num_proj=5 * c) for i in range(b)])
+
         return features_swd
     else:
         raise ValueError(f"No such feature metric: {features_metric_name}")
@@ -92,15 +90,24 @@ class VGGFeatures(nn.Module):
                 torch.nn.init.constant_(feat.bias, 0.0)
                 # torch.nn.init.constant_(feat.bias, 0.5)
 
-    def get_activations(self, z, normalize=False):
+    def get_activations(self, z, normalize=False, layers=None):
         if normalize:
             normalize_input = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             z = normalize_input(z)
 
+        if layers is None:
+            layers = layer_names
+
+        layer_indices = [layer_names.index(x) for x in layers]
+        max_layer = max(layer_indices)
+
         activations = dict()
-        for i, f in enumerate(self.features):
+        for i, f in enumerate(self.features[:max_layer + 1]):
             z = f(z)
-            activations[layer_names[i]] = z
+            if i in layer_indices:
+                activations[layer_names[i]] = z
+            if i == max_layer:
+                break
         return activations
 
 
@@ -116,7 +123,8 @@ class VGGPerceptualLoss(nn.Module):
         if layers_and_weights:
             self.layers_and_weights = layers_and_weights
         else:
-            self.layers_and_weights = [('pixels', 1.0), ('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0), ('conv4_3', 1.0),
+            self.layers_and_weights = [('pixels', 1.0), ('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0),
+                                       ('conv4_3', 1.0),
                                        ('conv5_3', 1.0)]
         self.batch_reduction = batch_reduction
         self.name = f"VGG({'reinit_' if reinit else ''}{'NormFC_' if norm_first_conv else ''}{'PT_' if pretrained else ''}M-{features_metric_name})"

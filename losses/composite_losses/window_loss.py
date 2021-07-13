@@ -15,8 +15,8 @@ class WindowLoss(torch.nn.Module):
     def forward(self, x, y):
         b, c = x.size(0), x.size(1)
         # (batch, c,  p,  x p n_patches)
-        x_uf = self.unfold(x).transpose(1,2).reshape(b, -1, c, self.window_size, self.window_size)
-        y_uf = self.unfold(y).transpose(1,2).reshape(b, -1, c, self.window_size, self.window_size)
+        x_uf = self.unfold(x).transpose(1, 2).reshape(b, -1, c, self.window_size, self.window_size)
+        y_uf = self.unfold(y).transpose(1, 2).reshape(b, -1, c, self.window_size, self.window_size)
 
         results = torch.stack([self.metric(x_uf[i], y_uf[i]) for i in range(b)])
         if self.batch_reduction == 'mean':

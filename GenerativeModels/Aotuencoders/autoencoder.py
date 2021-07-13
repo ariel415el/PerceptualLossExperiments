@@ -21,8 +21,6 @@ class AutoEncoderTraniner:
         self.params = params
         self.generator = generator.to(device)
         self.encoder = encoder.to(device)
-        # self.generator.apply(weights_init)
-        # self.encoder.apply(weights_init)
         self.criterion = criterion.to(device)
 
         self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.params.batch_size, self.device)
@@ -119,6 +117,6 @@ def plot_epoch(arr, y_name, outptus_dir):
     plt.plot(np.arange(len(arr)), arr)
     plt.xlabel("Epoch")
     plt.ylabel(y_name)
-    plt.title(f"{y_name} per epoch. last: {arr[-1]:.2f}")
+    plt.title(f"{y_name} per epoch. last: {arr[-1]:.4f}")
     plt.savefig(os.path.join(outptus_dir, f"{y_name}.png"))
     plt.clf()

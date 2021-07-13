@@ -9,7 +9,7 @@ from GenerativeModels.models import weights_init
 from GenerativeModels.utils.data_utils import get_dataloader
 import sys
 sys.path.append(os.path.realpath("../.."))
-from losses.mmd_loss import MMD
+from losses.mmd.mmd_loss import MMD
 from losses.vgg_loss.vgg_loss import VGGFeatures
 import numpy as np
 

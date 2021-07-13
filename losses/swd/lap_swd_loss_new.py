@@ -1,5 +1,5 @@
 import torch
-from losses.swd.swd import PatchSWDLoss
+from losses.swd.patch_swd import PatchSWDLoss
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
 
 class LapSWDLoss_new(torch.nn.Module):

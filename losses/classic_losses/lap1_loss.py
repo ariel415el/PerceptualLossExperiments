@@ -1,6 +1,6 @@
 from torch import nn
 import cv2
-from losses.l2 import L1, L2
+from losses.classic_losses.l2 import L1, L2
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
 
 

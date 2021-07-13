@@ -8,19 +8,16 @@ from torchvision import utils as vutils
 
 from GenerativeModels import models
 from GenerativeModels.utils.data_utils import get_dataset
-from losses.composite_losses.laplacian_losses import laplacian_pyramid, get_kernel_gauss, LaplacyanLoss
-from losses.experimental_patch_losses import MMD_PPP
-from losses.l2 import L2, L1
-from losses.lap1_loss import LapLoss
-from losses.patch_mmd_loss import MMDApproximate
-from losses.patch_mmd_pp import MMD_PP
-from losses.swd.lap_swd_loss import LapSWDLoss
-from losses.swd.lap_swd_loss_new import LapSWDLoss_new
+from losses.composite_losses.laplacian_losses import laplacian_pyramid, get_kernel_gauss
+from losses.experimental_patch_losses import MMD_PP
+from losses.classic_losses.l2 import L2, L1
+from losses.classic_losses.lap1_loss import LapLoss
+from losses.swd.swd import LapSWDLoss_new
 from losses.swd.swd import PatchSWDLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 from perceptual_mean_optimization.main import pt2cv
 
-from GenerativeModels.GLO.config import faces_config as params
+from GenerativeModels.config import default_config as params
 
 device = torch.device("cuda")
 

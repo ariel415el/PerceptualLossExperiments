@@ -9,11 +9,11 @@ from torchvision import utils as vutils
 from tqdm import tqdm
 
 from GenerativeModels import models
-from GenerativeModels.GLO.config import faces_config
+from GenerativeModels.config import default_config
 from GenerativeModels.models import weights_init
 from GenerativeModels.utils.data_utils import get_dataset, get_dataloader
-from losses.patch_mmd_loss import MMDApproximate
-from losses.patch_mmd_pp import MMD_PP
+from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.experimental_patch_losses import MMD_PP
 from losses.vgg_loss.vgg_loss import VGGFeatures, VGGPerceptualLoss
 
 
@@ -38,7 +38,7 @@ def save_batch(batch, dir):
 
 
 def load_models(device, ckp_dir=None):
-    params = faces_config
+    params = default_config
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim).to(device)
 
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim).to(device)
@@ -196,63 +196,19 @@ def mix_patches():
     print(loss(x, x_hat))
 
 
-def optimize_model(outputs_dir, train_dataset, n=25):
-    # encoder, generator = load_models('GenerativeModels/Aotuencoders/outputs/ffhq_128/L2/')
-    encoder, generator = load_models()
-    encoder.train()
-    generator.train()
-
-    # criterion = MMD_PP(device, patch_size=7, pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean',
-    #                    weights=[0.001, 0.05, 1.0]).to(device)
-    # criterion = L2().to(device)
-    criterion = VGGFeatures(pretrained=True).to(device)
-    # criterion = MMDApproximate(patch_size=7, pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean').to(device)
-    # criterion = VGGFeatures(pretrained=True).to(device)
-    # criterion = VGGFeatures(pretrained=False, norm_first_conv=True, reinit=True, weights=[1,1,1,1,1,1]).to(device)
-
-    images = torch.from_numpy(np.array([train_dataset[i][1] for i in range(n)])).to(device).float()
-    # images = torch.from_numpy(np.array([train_dataset[i][1] for i in [1, 56475, 11821, 20768,  6, 52650,  7563]])).to(device).float()
-    vutils.save_image(images, os.path.join(outputs_dir, f"orig.png"), normalize=True, nrow=int(np.sqrt(n)))
-
-    # Define optimizers
-    optimizerG = torch.optim.Adam(generator.parameters(), lr=0.001)
-    optimizerE = torch.optim.Adam(encoder.parameters(), lr=0.001)
-    pbar = tqdm(range(10001))
-    for i in pbar:
-        if i % 500 == 0:
-            recons = generator(encoder(images))
-            vutils.save_image(recons, os.path.join(outputs_dir, f"recons{i}.png"), normalize=True, nrow=int(np.sqrt(n)))
-
-        latent_codes = encoder(images)
-        fake_images = generator(latent_codes)
-
-        rec_loss = criterion(fake_images, images).mean()
-        rec_loss.backward()
-
-        optimizerE.step()
-        encoder.zero_grad()
-        optimizerG.step()
-        generator.zero_grad()
-        pbar.set_description(f"loss: {rec_loss}")
-        if (i + 1) % 1000 == 0:
-            for g, e in zip(optimizerG.param_groups, optimizerE.param_groups):
-                e['lr'] *= 0.9
-                g['lr'] *= 0.9
-
-
 if __name__ == '__main__':
     device = torch.device("cuda")
 
-    outputs_dir = 'Experiments_outputs'
+    outputs_dir = 'optimize_model'
+    os.makedirs(outputs_dir, exist_ok=True)
+    params = default_config
+    train_dataset = get_dataset('ffhq', split='test', resize=params.img_dim)
+
+
     # mix_patches()
     # analyze_perceptual_features_intencities()
 
-    test_swd(outputs_dir)
-
-    os.makedirs(outputs_dir, exist_ok=True)
-
-    params = faces_config
-    train_dataset = get_dataset('ffhq', split='test', resize=params.img_dim)
+    # test_swd(outputs_dir)
     # invert_perceptual_features(train_dataset)
 
     # optimize_model(outputs_dir, train_dataset, n=64)
