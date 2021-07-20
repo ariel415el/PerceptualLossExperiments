@@ -5,13 +5,15 @@ import torch
 from dataset import get_dataloader
 
 # from losses.mmd_exact_loss import MMDExact
-from losses.mmd.patch_mmd_loss import MMDApproximate
+from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
 def mse_looss(x,y):
     return torch.mean((x.view(x.size(0),-1)-y.view(x.size(0),-1))**2, dim=1)
+
 
 def score_2afc_dataset(data_loader, func, name=''):
     ''' Function computes Two Alternative Forced Choice (2AFC) score using
@@ -54,8 +56,11 @@ def score_2afc_dataset(data_loader, func, name=''):
 def main():
     criterions = [
         # MMD_PP(batch_reduction='none'),
-        MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
-        MMDApproximate(patch_size=3, sigma=0.1, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        VGGPerceptualLoss(pretrained=False, batch_reduction='none'),
+        VGGPerceptualLoss(pretrained=False, reinit=True, batch_reduction='none'),
+        VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, batch_reduction='none')
+        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        # MMDApproximate(patch_size=3, sigma=0.1, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
         # MMDApproximate(patch_size=3, sigma=0.06, pool_size=16, pool_strides=8, r=64, batch_reduction='none', normalize_patch='channel_mean'),
         # MMDApproximate(patch_size=3, sigma=0.06, pool_size=8, pool_strides=4, r=64, batch_reduction='none', normalize_patch='channel_mean'),
     ]
