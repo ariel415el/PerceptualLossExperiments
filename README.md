@@ -18,13 +18,39 @@ originaly proposed at (The Unreasonable Effectiveness of Deep Features as a Perc
 As opposed to the original paper were randomly initialized VGG works worse than trained VGG Dan shows a simple variant random VGG that acheives comparable reults.
 The MMD++ loss as well.
 
+*2AFC sample*             |  *results table*
+:------------------------:|:-----------------------:
+![](assets/2afc-ref.png)  |  ![](assets/2afc.png)
+
+
 ## 2. Perceptual mean optimization
 This type of experiment also appear in Dan's work under the name Generalized Image Mean (GIM). The mean of a set of images in L2 is a blurry unrealistic one. Optimizing for the mean of the same images while using VGG-loss as a metric leads to much smooth and perceptually good looking results. This leads to a set of experiments tha allow comparing the results of optimization  a mea image with different image losses.
 Here, in some cases MMD++ shows a better performance than VGG.
+
+*2 sets of 6 similar images*                                   | *results with different losses*  
+:-----------------------------------------------------------:  |:-----------------------------------------------------------: 
+<img src="assets/GIM__inputs.png" alt="drawing" width="500"/>  | <img src="assets/GIM__results.png" alt="drawing" width="500"/> 
+
 
 ## 3. Perceptual clustering.
 cluster datasets using kmeans/one-hot-autoencoders while using perceptual distance metrics
 
 ## 4. Generative models.
 Train autoencoder/GLO[https://arxiv.org/abs/1707.05776] with VGG-loss instead of L2 is known to work better. Here I show this and try to acheive comparable results with random VGGs and MMD++.
+Below are train-set reconstruction results of encoders (a DCGan generator and a similar encoder) trained on 128x128 FFHQ dataset with different losses
 
+
+*L2*                                                         | *VGG pretrained*  
+:-----------------------------------------------------------:  |:-----------------------------------------------------------: 
+<img src="assets/AE_L2.png" alt="drawing" width="300"/>  | <img src="assets/AE_VGG-Pt.png" alt="drawing" width="300"/> 
+
+*VGG random          *                                     | *MMD++*  
+:-----------------------------------------------------------:  |:-----------------------------------------------------------: 
+<img src="assets/AE_VGG-rand.png" alt="drawing" width="300"/>  | <img src="assets/AE_MMD++(P=3).png" alt="drawing" width="300"/> 
+<!-- 
+| Loss                  |Reconstruction                                                 |
+|-----------------------|---------------------------------------------------------------|
+| L2                    |<img src="assets/AE_L2.png" alt="drawing" width="300"/>  |
+| VGG-random            |<img src="assets/AE_VGG-rand.png" alt="drawing" width="300"/>  |
+| VGG-pretrained        |<img src="assets/AE_VGG-Pt.png" alt="drawing" width="300"/>  |
+| MMD++                 |<img src="assets/AE_MMD++(P=3).png" alt="drawing" width="300"/>  | -->
