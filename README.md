@@ -14,7 +14,7 @@ and extend them to more practical high-end tasks like image generation.
 
 ## 1. Adobe 2 Alternative Forced choice test (2AFC)
 The first clue about the nature of VGG-loss comes from the Adobe-2AFC test:
-originaly proposed at (The Unreasonable Effectiveness of Deep Features as a Perceptual Metric)[https://arxiv.org/pdf/1801.03924.pdf] this test is referenced in Dan's work as well. The Adobe-2AFC dataset contains patch triplets labeld by humans for which one of the first two is closer to the third perceptualy. These annotation are ued as GT for perceptual loses to be tested on.
+originaly proposed at [The Unreasonable Effectiveness of Deep Features as a Perceptual Metric](https://arxiv.org/pdf/1801.03924.pdf) this test is referenced in Dan's work as well. The Adobe-2AFC dataset contains patch triplets labeld by humans for which one of the first two is closer to the third perceptualy. These annotation are ued as GT for perceptual loses to be tested on.
 As opposed to the original paper were randomly initialized VGG works worse than trained VGG Dan shows a simple variant random VGG that acheives comparable reults.
 The MMD++ loss as well.
 
@@ -36,7 +36,7 @@ Here, in some cases MMD++ shows a better performance than VGG.
 cluster datasets using kmeans/one-hot-autoencoders while using perceptual distance metrics
 
 ## 4. Generative models.
-Train autoencoder/GLO[https://arxiv.org/abs/1707.05776] with VGG-loss instead of L2 is known to work better. Here I show this and try to acheive comparable results with random VGGs and MMD++.
+Train autoencoder/[GLO](https://arxiv.org/abs/1707.05776) with VGG-loss instead of L2 is known to work better. Here I show this and try to acheive comparable results with random VGGs and MMD++.
 Below are train-set reconstruction results of encoders (a DCGan generator and a similar encoder) trained on 128x128 FFHQ dataset with different losses
 
 
