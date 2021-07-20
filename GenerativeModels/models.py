@@ -26,7 +26,7 @@ class DCGANGenerator(nn.Module):
             padding = [0, 1, 1, 1, 1]
         elif output_img_dim == 128:
             layer_depths = [input_dim, 512, 512, 256, 128, 64]
-            # layer_depths = [input_dim, 16, 16, 16, 16, 16]
+            # layer_depths = [input_dim, 64, 64, 64, 64, 64]
             kernel_dim = [4, 4, 4, 4, 4, 4]
             strides = [1, 2, 2, 2, 2, 2]
             padding = [0, 1, 1, 1, 1, 1]
@@ -60,7 +60,7 @@ class DCGANEncoder(nn.Module):
             layer_depth = [channels, 64, 128, 256, 512]
         elif input_img_dim == 128:
             layer_depth = [channels, 64, 128, 256, 512, 512]
-            # layer_depth = [channels, 16, 16, 16, 16, 16]
+            # layer_depth = [channels, 64, 64, 64, 64, 64]
         else:
             raise ValueError("Image dim supports only 28, 64, 128")
         layers = []

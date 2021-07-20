@@ -9,20 +9,21 @@ import sys
 
 from GenerativeModels.models import weights_init
 from GenerativeModels.utils.test_utils import run_FID_tests, run_swd_tests
-from losses.classic_losses.l2 import L1
+from losses.classic_losses.l2 import L1, L2
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
 from losses.composite_losses.list_loss import LossesList
 from losses.experimental_patch_losses import MMD_PP
 from losses.classic_losses.grad_loss import GradLoss
 from losses.mmd.windowed_patch_mmd import MMDApproximate
 from losses.patch_loss import PatchRBFLoss
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 sys.path.append(os.path.realpath("../.."))
 from GenerativeModels.Aotuencoders.autoencoder import AutoEncoderTraniner
 from GenerativeModels.GLO.IMLE import IMLE
 from GenerativeModels.config import default_config
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler
-from GenerativeModels.utils.data_utils import get_dataset, get_dataloader
+from GenerativeModels.utils.data_utils import get_dataset, get_dataloader, read_lfw_data
 from GenerativeModels import models
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -34,26 +35,31 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def train_autoencoder(dataset_name, train_name, tag):
     params = default_config
     train_dataset = get_dataset(dataset_name, split='train', resize=params.img_dim)
+    # train_dataset, labels = read_lfw_data('../../../../data/LFW', img_size=128)
+
     print("Dataset size: ", len(train_dataset))
 
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
-    # encoder.apply(weights_init)
-    encoder.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/encoder.pth'))
+    encoder.apply(weights_init)
+    # encoder.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/encoder.pth'))
 
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim)
-    # generator.apply(weights_init)
-    generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/generator.pth'))
+    generator.apply(weights_init)
+    # generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/generator.pth'))
 
     # Define the loss criterion
-    # criterion = L1()
+    # criterion = L2()
     # criterion = MMD_PP(r=64)
     # criterion = LossesList([
     #     L1(),
     #     GradLoss()
     # ], weights=[0.001,1])
 
-    criterion = MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=64, normalize_patch='channel_mean')
+    # criterion = VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv1_2', 1.0)])
+    # criterion = VGGPerceptualLoss(pretrained=True)
+    criterion = VGGPerceptualLoss(pretrained=False, reinit=True, layers_and_weights=[('conv1_2', 1.0)])
+    # criterion = MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=64, normalize_patch='channel_mean')
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     trainer = AutoEncoderTraniner(default_config, encoder, generator, criterion, train_dataset, device)
@@ -132,6 +138,6 @@ def evaluate_generator(outputs_dir):
 
 if __name__ == '__main__':
     train_name = f"ffhq_128_exp"
-    train_autoencoder('ffhq', train_name, '-from-l2')
+    train_autoencoder('ffhq', train_name, 'VGG-only-first-layer')
     # train_latent_samplers('outputs/ffhq_128/VGG-None_PT')
     # evaluate_generator('outputs/test/VGG-None_PT')

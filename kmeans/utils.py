@@ -42,8 +42,7 @@ def read_cifar_10_data(root_dir, restrict_labels=None, limit_samples=None):
     print(f"done in {time() - start:.2f} s, data shape = {reshaped_data.shape}")
     return reshaped_data, labels, img_size, dataset_name
 
-def read_lfw_data(root_dir, num_celebs):
-    img_size = 64
+def read_lfw_data(root_dir, num_celebs, img_size=64):
     dataset_name = f"LFW-top{num_celebs}"
     start = time()
     print(f"Reading LFW ({num_celebs} largest celebs).. ", end='')

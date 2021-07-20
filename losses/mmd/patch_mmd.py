@@ -53,10 +53,10 @@ def compute_MMD(x, y, sigmas=None):
 
 
 class PatchMMDLoss(torch.nn.Module):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, batch_reduction='mean', sigmas=None):
+    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, sigmas=None, batch_reduction='mean', normalize_patch='none'):
         super(PatchMMDLoss, self).__init__()
         patch_metric = lambda x,y: compute_MMD(x, y, sigmas)
-        self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations, batch_reduction)
+        self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations, batch_reduction, normalize_patch)
         self.name = f"PatchMMD(p-{patch_size}-{stride})"
 
     def forward(self, x, y):

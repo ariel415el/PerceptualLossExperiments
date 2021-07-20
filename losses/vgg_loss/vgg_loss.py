@@ -60,7 +60,6 @@ class VGGFeatures(nn.Module):
         for v in cfg:
             if v == 'M':
                 features += [nn.MaxPool2d(kernel_size=2, stride=2)]
-                # features += [MaxBlurPool(in_channels)]
             else:
                 conv2d = nn.Conv2d(in_channels, v, kernel_size=(3, 3), padding=1)
                 features += [conv2d, nn.ReLU(inplace=True)]
@@ -113,7 +112,7 @@ class VGGFeatures(nn.Module):
 
 class VGGPerceptualLoss(nn.Module):
     def __init__(self, layers_and_weights=None, pretrained=False, reinit=False, norm_first_conv=False,
-                 features_metric_name='l1', batch_reduction='mean'):
+                 features_metric_name='l1', batch_reduction='mean', name=None):
         super(VGGPerceptualLoss, self).__init__()
         assert not (reinit and pretrained), "better not reinit pretrained weights"
         self.VGGFeatures = VGGFeatures(pretrained, norm_first_conv)
@@ -124,19 +123,22 @@ class VGGPerceptualLoss(nn.Module):
             self.layers_and_weights = layers_and_weights
         else:
             self.layers_and_weights = [('pixels', 1.0), ('conv1_2', 1.0), ('conv2_2', 1.0), ('conv3_3', 1.0),
-                                       ('conv4_3', 1.0),
-                                       ('conv5_3', 1.0)]
+                                       ('conv4_3', 1.0), ('conv5_3', 1.0)]
         self.batch_reduction = batch_reduction
-        self.name = f"VGG({'reinit_' if reinit else ''}{'NormFC_' if norm_first_conv else ''}{'PT_' if pretrained else ''}M-{features_metric_name})"
+        if name is None:
+            self.name = f"VGG({'reinit_' if reinit else ''}{'NormFC_' if norm_first_conv else ''}{'PT_' if pretrained else ''}M-{features_metric_name})"
+        else:
+            self.name = name
 
     def forward(self, x, y):
         if self.reinit:
             self.VGGFeatures.initialize_weights_randomly()
 
-        fx = self.VGGFeatures.get_activations(x)
-        fy = self.VGGFeatures.get_activations(y)
-        fx.update({"pixels": x})
-        fy.update({"pixels": y})
+        fx = self.VGGFeatures.get_activations(x, layers=[x[0] for x in self.layers_and_weights if x[0] != 'pixels'])
+        fy = self.VGGFeatures.get_activations(y, layers=[x[0] for x in self.layers_and_weights if x[0] != 'pixels'])
+        if 'pixels' in [x[0] for x in self.layers_and_weights]:
+            fx.update({"pixels": x})
+            fy.update({"pixels": y})
 
         loss = 0
         for layer_name, w in self.layers_and_weights:

@@ -17,7 +17,7 @@ from losses.mmd.windowed_patch_mmd import MMDApproximate, MMDExact
 from losses.swd.lap_swd_loss import compute_lap_swd
 
 from losses.composite_losses.list_loss import LossesList
-from losses.experimental_patch_losses import MMD_PP, MMD_PPP
+from losses.experimental_patch_losses import MMD_PP, MMD_PPP, EngeneeredPerceptualLoss, SimplePatchLoss
 from losses.classic_losses.grad_loss import GradLoss
 from losses.swd.patch_swd import PatchSWDLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
@@ -64,6 +64,7 @@ def load_images(dir_path, sort=True):
         # img = cv2.resize(img, (64,64))
         # img = img[125 - 90:125 + 80, 125 - 75:125 + 75]
         img = cv2pt(img)
+
         images.append(img)
 
     return torch.stack(images)
@@ -73,33 +74,40 @@ def split_to_lines(txt, n):
     return "\n".join([txt[i:i + n] for i in range(0, len(txt), n)])
 
 
-def optimize_for_mean(images, criteria, output_dir=None, weights=None, batch_size=None, num_steps=400, lr=0.003):
+def get_starting_point(images, mode):
+    res = images.mean(0)
+    if 'mean' in mode:
+        pass
+    if 'gray' in mode:
+        res = torch.ones(res.shape) * torch.mean(res, dim=(0), keepdim=True)
+    elif 'zeros' in mode:
+        res *= 0
+    if 'blur' in mode:
+        from losses.composite_losses.laplacian_losses import conv_gauss, get_kernel_gauss
+        res = conv_gauss(res.unsqueeze(0), get_kernel_gauss(size=7, sigma=5, n_channels=3))[0]
+    if 'noise' in mode:
+        res += torch.randn(res.shape) * 0.1
+    if 'gray-noise' in mode:
+        res += torch.randn((1, res.shape[-2], res.shape[-1])) * 0.5
+
+    return res
+
+
+def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, weights=None, batch_size=None,
+                      num_steps=400, lr=0.003):
     """
     :param images: tensor of shape (N, C, H, W)
     """
     images = images.to(device)
+    optimized_variable = optimized_variable.to(device)
+    optimized_variable.requires_grad_(True)
     criteria = criteria.to(device)
 
-    optimized_variable = images.mean(0)
-    from losses.composite_losses.laplacian_losses import conv_gauss, get_kernel_gauss
-    optimized_variable = conv_gauss(images, get_kernel_gauss(size=13, sigma=15, n_channels=3).to(device))[0]
-    # optimized_variable = F.upsample(F.avg_pool2d(images,  (2,2)), scale_factor=2)[0]
-    # optimized_variable = F.upsample(F.avg_pool2d(optimized_variable,  (2,2)), images.shape[1:])
-    # optimized_variable *= 0
-    # optimized_variable += torch.mean(optimized_variable, dim=(1, 2), keepdim=True)
-    # optimized_variable = torch.randn(optimized_variable.shape).to(device).clamp(-1, 1) * 0.1
-    # optimized_variable = torch.ones((images.shape[1:])).to(device) * torch.mean(images, dim=(0, 2, 3), keepdim=True)[0]
-    # optimized_variable += torch.randn(optimized_variable.shape).to(device) * 0.1
-    # optimized_variable += torch.randn(1, optimized_variable.shape[-2], optimized_variable.shape[-1]).to(device) * 0.1
-
-    vutils.save_image(optimized_variable, os.path.join(output_dir, f"init_img.png"), normalize=True)
-
-    optimized_variable.requires_grad_(True)
-    # optim = torch.optim.SGD([optimized_variable], lr=lr)
     optim = torch.optim.Adam([optimized_variable], lr=lr)
+    # optim = torch.optim.SGD([optimized_variable], lr=lr)
     losses = []
     for i in tqdm(range(num_steps + 1)):
-        if i % 1 == 0 and output_dir is not None:
+        if i % 100 == 0 and output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
             optimized_image = optimized_variable
             vutils.save_image(optimized_image, f"{output_dir}/output-{i}.png", normalize=True)
@@ -111,8 +119,9 @@ def optimize_for_mean(images, criteria, output_dir=None, weights=None, batch_siz
         else:
             batch_images = images[np.random.choice(range(len(images)), batch_size, replace=False)]
         batch_input = optimized_variable.repeat(batch_size, 1, 1, 1)
-        # loss = criteria(batch_input, batch_images) + (optimized_variable**2).mean()
         loss = criteria(batch_input, batch_images)  # + calc_TV_Loss(optimized_variable.unsqueeze(0))
+        # loss = criteria(torch.mean(batch_input, dim=(1), keepdim=True).repeat(1,3,1,1),
+        #                 torch.mean(batch_images, dim=(1), keepdim=True).repeat(1,3,1,1))
         if weights is not None:
             loss *= torch.tensor(weights).to(device)
         loss = loss.mean()
@@ -170,10 +179,10 @@ def run_sigle():
 
 def batch_run():
     image_dirs = [
-        'clusters/z_samples_new/1/data_neighbors1',
+        # 'clusters/z_samples_new/1/data_neighbors1',
         # 'clusters/z_samples_new/4/data_neighbors4',
-        'clusters/z_samples_new/6/data_neighbors6',
-        'clusters/z_samples_new/10/data_neighbors10',
+        # 'clusters/z_samples_new/6/data_neighbors6',
+        # 'clusters/z_samples_new/10/data_neighbors10',
         # 'clusters/z_samples_new/16/data_neighbors16',
         # 'clusters/z_samples_new/51/data_neighbors51',
         # 'clusters/z_samples_new/55/data_neighbors55',
@@ -182,10 +191,10 @@ def batch_run():
         # 'clusters/ffhq_jitters/00083_128',
         # 'clusters/increasing_variation/36126_s128_c_64/images',
         # 'clusters/increasing_variation/36096_s128_c_32',
-        # 'clusters/increasing_variation/36096_s128_c_64',
+        'clusters/increasing_variation/36096_s128_c_64',
         # 'clusters/increasing_variation/36096_s128_c_128',
         # 'clusters/increasing_variation/36126_s128_c_32',
-        # 'clusters/increasing_variation/36126_s128_c_64',
+        'clusters/increasing_variation/36126_s128_c_64',
         # 'clusters/increasing_variation/36126_s128_c_128',
         # 'clusters/increasing_variation/36096_s64_c_64/images'
         # 'clusters/z_samples/latent_neighbors_direction10'
@@ -194,44 +203,48 @@ def batch_run():
 
     losses = [
         # L2(batch_reduction='none'),
-        PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none'),
-        # MMD_PP(r=128),
-        # LossesList([
-        #     GradLoss(),
-        #     MMD_PP(r=128),
-        # ], weights=[0.1, 1]),
-        # VGGPerceptualLoss(pretrained=True),
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=16, pool_strides=8, r=256, batch_reduction='none', normalize_patch='channel_mean'),
-        MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=256, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=21, sigma=0.015, pool_size=32, pool_strides=16, r=256, batch_reduction='none', normalize_patch='channel_mean'),
+        GradLoss(batch_reduction='none'),
+        EngeneeredPerceptualLoss(relu_bias=-1, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=-0.5, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=-0.1, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=0, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=0.1, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=0.5, batch_reduction='none', pool_window=32, pool_stride=16),
+        EngeneeredPerceptualLoss(relu_bias=1, batch_reduction='none', pool_window=32, pool_stride=16),
 
-        # VGGPerceptualLoss(pretrained=True,layers_and_weights=[('conv4_3', 1.0)]),
-        # VGGPerceptualLoss(pretrained=True)
-        # MMDApproximate(patch_size=21, sigma=0.01, pool_size=32, pool_strides=32, r=256, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=21, sigma=0.02, pool_size=128, pool_strides=128, r=256, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=21, sigma=0.02, pool_size=128, pool_strides=128, r=256, batch_reduction='none'),
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=128, pool_strides=128, r=1024, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=1024, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=1024, batch_reduction='none', normalize_patch='channel_mean'),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=512), window_size=128, stride=128),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=512), window_size=64, stride=64),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=512, sigmas=[20]), window_size=32, stride=32),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=32, sigmas=[20]), window_size=32, stride=16),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=64, sigmas=[20]), window_size=32, stride=16),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=128, sigmas=[20]), window_size=32, stride=16),
+        MMD_PP(r=128, normalize_patch='channel_mean'),
+        MMD_PPP(r=128, normalize_patch='channel_mean'),
+        # VGGPerceptualLoss(pretrained=True),
+
+        # LossesList([
+        #     GradLoss(batch_reduction='none'),
+        #     PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction='none', normalize_patch='none')
+        # ], weights=[0.1, 1], name='0.1*GradLoss+PatchLoss(11)'),
+
+        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=128, batch_reduction='none', normalize_patch='channel_mean'),
+        #
+        # LossesList([
+        #     GradLoss(batch_reduction='none'),
+        #     MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=128, batch_reduction='none', normalize_patch='channel_mean'),
+        # ], weights=[0.1, 1], name='0.1*GradLoss+MMD'),
+        #
+        # MMD_PP(r=128, normalize_patch='channel_mean'),
+        #
+        # LossesList([
+        #     GradLoss(batch_reduction='none'),
+        #     MMD_PP(r=128, normalize_patch='channel_mean'),
+        # ], weights=[0.1, 1], name='0.1*GradLoss+MMD++'),
+
     ]
 
-    num_images = 1
-    # weights = [1] * num_images
-    weights = None
-    root = 'outputs/from_blurred_image'
-    tag = f"_{num_images}-{weights}"
+    num_images = 12
+    start_mode = 'mean'
+    root = f'outputs/{num_images}_{start_mode}'
+    tag = f""
 
     all_inputs = []
     swd_scores = dict()
-    fig, axs = plt.subplots(len(image_dirs), len(losses), figsize=(
-    3 * len(losses), 3 * len(image_dirs)))  # , gridspec_kw={'wspace':0, 'hspace':0.25})
+    fig, axs = plt.subplots(len(image_dirs), len(losses) + 1, figsize=(3 + 3 * len(losses), 3 * len(image_dirs)))
 
     grad_criterion = GradLoss(batch_reduction='none')
 
@@ -240,10 +253,15 @@ def batch_run():
         images = load_images(images_dir)[:num_images]
         images_name = tag + "_" + os.path.basename(images_dir)
         os.makedirs(os.path.join(root, images_name), exist_ok=True)
+        starting_img = get_starting_point(images, start_mode)
+        axs[i, 0].imshow(pt2cv(starting_img.detach().cpu().numpy()))
+        axs[i, 0].set_title("Starting image")
+        axs[i, 0].axis('off')
+        axs[i, 0].set_aspect('equal')
         for j, loss in enumerate(losses):
             output_dir = os.path.join(root, images_name, loss.name)
             os.makedirs(output_dir, exist_ok=True)
-            img = optimize_for_mean(images, loss, output_dir, weights=weights, num_steps=200, lr=0.1)
+            img = optimize_for_mean(starting_img.clone(), images, loss, output_dir, num_steps=200, lr=0.1)
             vutils.save_image(img, os.path.join(root, images_name, f"{loss.name}.png"), normalize=True)
 
             swd_score = compute_lap_swd(img.repeat(len(images), 1, 1, 1), images.to(device), device='cpu',
@@ -254,15 +272,15 @@ def batch_run():
                 swd_scores[loss.name] = [swd_score.numpy()]
 
             grad_loss = grad_criterion(img.repeat(len(images), 1, 1, 1), images.to(device))
-            axs[i, j].imshow(pt2cv(img.detach().cpu().numpy()))
+            axs[i, j + 1].imshow(pt2cv(img.detach().cpu().numpy()))
             # name = '\n'.join(loss.name.split("="))
             # axs[i, j].set_title(f"{loss.name.split('(')[0]}"
-            axs[i, j].set_title(f"{loss.name}"
-                                f"\nSWD:{swd_score.mean():.1f}"
-                                f"\nGradLoss min: {grad_loss.min():.3f}"
-                                f"\nGradLoss avg: {grad_loss.mean():.3f}", size=10)
-            axs[i, j].axis('off')
-            axs[i, j].set_aspect('equal')
+            axs[i, j + 1].set_title(f"{loss.name}"
+                                    f"\nSWD:{swd_score.mean():.1f}"
+                                    f"\nGradLoss min: {grad_loss.min():.3f}"
+                                    f"\nGradLoss avg: {grad_loss.mean():.3f}", size=10)
+            axs[i, j + 1].axis('off')
+            axs[i, j + 1].set_aspect('equal')
 
         all_inputs.append(images)
 

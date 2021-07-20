@@ -1,4 +1,5 @@
 import os
+import random
 
 import cv2
 import numpy as np
@@ -26,7 +27,9 @@ class DiskDataset(Dataset):
     def __getitem__(self, idx):
         img = cv2.imread(self.image_paths[idx])
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if self.crop:
+        if self.crop == 'lfw':
+            img = img[64:-64, 64:-64]
+        elif self.crop == 'celebA':
             img = img[109 - 90:109 + 80, 89 - 85:89 + 85]  # CelebA
         img = cv2.resize(img, (self.resize, self.resize)) / 255.0
         img = img.transpose((2, 0, 1))
@@ -98,3 +101,17 @@ def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ar
         dataset = dataset_type(img_paths[:val_size], **kwargs)
 
     return dataset
+
+
+def read_lfw_data(root_dir, img_size):
+    paths = []
+    labesl = []
+    # celeb_names = os.listdir(os.path.join(root_dir, 'lfw-deepfunneled'))
+    celeb_names = ['Ariel_Sharon', 'Serena_Williams', 'Andre_Agassi', 'Luiz_Inacio_Lula_da_Silva', 'Jennifer_Lopez',
+                   'Nicole_Kidman', 'Halle_Berry', 'Laura_Bush', 'Roh_Moo-hyun', 'Kofi_Annan']
+    for celeb_name in celeb_names:
+        for fn in os.listdir(os.path.join(root_dir, 'lfw-deepfunneled', celeb_name)):
+            paths.append(os.path.join(root_dir, 'lfw-deepfunneled', celeb_name, fn))
+            labesl.append(celeb_name)
+    random.shuffle(paths)
+    return DiskDataset(paths, resize=img_size, crop='lfw'), labesl
