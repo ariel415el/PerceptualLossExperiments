@@ -35,7 +35,22 @@ Here, in some cases MMD++ shows a better performance than VGG.
 ## 3. Perceptual clustering.
 cluster datasets using kmeans/one-hot-autoencoders while using perceptual distance metrics
 
-## 4. Generative models.
+## 4. Style transfer.
+The most promiment line of work in neural style transfer surged by a serie of paper by Gatis et Al [Image Style Transfer Using Convolutional Neural Networks](https://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Gatys_Image_Style_Transfer_CVPR_2016_paper.pdf).
+The key concept is using L2 distane between VGG feature maps/ Gram matrices of those feature maps in order to conserve content/style accordingly.
+This is very much related to the concept of perceptual loss but experiments with random VGG network show poor results.
+
+*content + style| *VGG pretrained*    | *VGG random*  
+:---------------:|:-----------:|:-----------:|
+<img src="assets/Style_transfer5.png" alt="drawing" width="500"/>|<img src="assets/Style_transfer3.png" alt="drawing" width="250"/>|<img src="assets/Style_transfer4.png" alt="drawing" width="500"/> 
+
+
+#### Normalized Gram matrix of style image
+ *VGG pretrained*    | *VGG random*  
+:---------------:|:-----------:|
+<img src="assets/Style_transfer1.png" alt="drawing" width="500"/> | <img src="assets/Style_transfer2.png" alt="drawing" width="500"/>
+
+## 5. Generative models.
 Train autoencoder/[GLO](https://arxiv.org/abs/1707.05776) with VGG-loss instead of L2 is known to work better. Here I show this and try to acheive comparable results with random VGGs and MMD++.
 Below are train-set reconstruction results of encoders (a DCGan generator and a similar encoder) trained on 128x128 FFHQ dataset with different losses
 
