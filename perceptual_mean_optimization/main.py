@@ -6,25 +6,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torchvision.utils as vutils
-import torch.nn.functional as F
 import sys
 
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
+from losses.composite_losses.list_loss import LossesList
 from losses.composite_losses.pyramid_loss import PyramidLoss
 from losses.composite_losses.window_loss import WindowLoss
-from losses.mmd.patch_mmd import PatchMMDLoss
-from losses.mmd.windowed_patch_mmd import MMDApproximate, MMDExact
-from losses.swd.lap_swd_loss import compute_lap_swd
+from losses.gabor_loss.gabor import GaborPerceptualLoss
 
-from losses.composite_losses.list_loss import LossesList
-from losses.experimental_patch_losses import MMD_PP, MMD_PPP, EngeneeredPerceptualLoss, SimplePatchLoss
+from losses.experimental_patch_losses import EngeneeredPerceptualLoss, SimplePatchLoss, MMD_PP, MMD_PPP
 from losses.classic_losses.grad_loss import GradLoss
+from losses.mmd.patch_mmd import PatchMMDLoss
+from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.patch_loss import PatchRBFLoss
+from losses.swd.lap_swd_loss import compute_lap_swd
 from losses.swd.patch_swd import PatchSWDLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 sys.path.append(os.path.realpath(".."))
-from losses.patch_loss import PatchRBFLoss
-from losses.classic_losses.l2 import L2
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -56,6 +55,7 @@ def load_images(dir_path, sort=True):
     paths = os.listdir(dir_path) if not sort else sorted(os.listdir(dir_path), key=lambda x: int(x.split(".")[0]))
     for fn in paths:
         img = cv2.imread(os.path.join(dir_path, fn))
+        # img = img[32:-32, 32:64]
         img = cv2pt(img)
 
         images.append(img)
@@ -65,24 +65,21 @@ def load_images(dir_path, sort=True):
 
 def get_starting_point(images, mode):
     res = images.mean(0)
-    if 'mean' in mode:
-        pass
-    if 'gray' in mode:
-        res = torch.ones(res.shape) * torch.mean(res, dim=(0), keepdim=True)
-    elif 'zeros' in mode:
-        res *= 0
-    if 'blur' in mode:
-        from losses.composite_losses.laplacian_losses import conv_gauss, get_kernel_gauss
-        res = conv_gauss(res.unsqueeze(0), get_kernel_gauss(size=7, sigma=5, n_channels=3))[0]
-    if 'noise' in mode:
-        res += torch.randn(res.shape) * 0.1
-    if 'gray-noise' in mode:
-        res += torch.randn((1, res.shape[-2], res.shape[-1])) * 0.5
+    for name in mode.split("+"):
+        if 'gray' in mode:
+            res = torch.ones(res.shape) * torch.mean(res, dim=(0), keepdim=True)
+        elif 'zeros' in mode:
+            res *= 0
+        if 'blur' in mode:
+            from losses.composite_losses.laplacian_losses import conv_gauss, get_kernel_gauss
+            res = conv_gauss(res.unsqueeze(0), get_kernel_gauss(size=9, sigma=7, n_channels=3))[0]
+        if 'noise' in mode:
+            res += torch.randn(res.shape) * 0.3
 
     return res
 
 
-def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, weights=None, batch_size=None,
+def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, batch_size=None,
                       num_steps=400, lr=0.003):
     """
     :param images: tensor of shape (N, C, H, W)
@@ -98,10 +95,9 @@ def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, wei
     # optim = torch.optim.SGD([optimized_variable], lr=lr)
     losses = []
     for i in tqdm(range(num_steps + 1)):
-        if i % 100 == 0 and output_dir is not None:
+        if i % 50 == 0 and output_dir is not None:
             os.makedirs(output_dir, exist_ok=True)
-            optimized_image = optimized_variable
-            vutils.save_image(optimized_image, f"{output_dir}/output-{i}.png", normalize=True)
+            vutils.save_image(optimized_variable.clone(), f"{output_dir}/output-{i}.png", normalize=True)
 
         optim.zero_grad()
         if batch_size is None:
@@ -109,20 +105,17 @@ def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, wei
             batch_images = images
         else:
             batch_images = images[np.random.choice(range(len(images)), batch_size, replace=False)]
-        batch_input = optimized_variable.repeat(batch_size, 1, 1, 1)
-        loss = criteria(batch_input, batch_images)  # + calc_TV_Loss(optimized_variable.unsqueeze(0))
-        # loss = criteria(torch.mean(batch_input, dim=(1), keepdim=True).repeat(1,3,1,1),
-        #                 torch.mean(batch_images, dim=(1), keepdim=True).repeat(1,3,1,1))
-        if weights is not None:
-            loss *= torch.tensor(weights).to(device)
+
+        loss = criteria(optimized_variable.repeat(batch_size, 1, 1, 1), batch_images)
+
         loss = loss.mean()
         loss.backward()
         optim.step()
         losses.append(loss.item())
 
-        if i % 200 == 0:
+        if i % 100 == 0:
             for g in optim.param_groups:
-                g['lr'] *= 0.5
+                g['lr'] *= 0.75
         if i % 100 == 0 and output_dir is not None:
             fig1 = plt.figure()
             ax = fig1.add_subplot(111)
@@ -134,7 +127,6 @@ def optimize_for_mean(optimized_variable, images, criteria, output_dir=None, wei
     optimized_image = torch.clip(optimized_variable, -1, 1)
 
     return optimized_image
-
 
 
 class Plotter:
@@ -153,52 +145,92 @@ class Plotter:
         self.fig.savefig(path)
         plt.clf()
 
+
 def batch_run():
     image_dirs = [
-        'clusters/z_samples_new/1/data_neighbors1',
+        # 'clusters/z_samples_new/1/data_neighbors1',
         # 'clusters/z_samples_new/4/data_neighbors4',
         'clusters/z_samples_new/6/data_neighbors6',
         # 'clusters/z_samples_new/10/data_neighbors10',
         # 'clusters/z_samples_new/16/data_neighbors16',
-        # 'clusters/z_samples_new/51/data_neighbors51',
-        # 'clusters/z_samples_new/55/data_neighbors55',
-        'clusters/stylegan/stylegan_128/images',
+        'clusters/z_samples_new/51/data_neighbors51',
+        'clusters/z_samples_new/55/data_neighbors55',
+        # 'clusters/stylegan/stylegan_128/images',
         # 'clusters/ffhq_jitters/00068_128',
         # 'clusters/ffhq_jitters/00083_128',
-        # 'clusters/increasing_variation/36126_s128_c_64/images',
+        # 'clusters/increasing_variation/36126_s128_c_64',
         # 'clusters/increasing_variation/36096_s128_c_32',
         # 'clusters/increasing_variation/36096_s128_c_64',
         # 'clusters/increasing_variation/36096_s128_c_128',
         # 'clusters/increasing_variation/36126_s128_c_32',
-        'clusters/increasing_variation/36126_s128_c_64',
+        # 'clusters/increasing_variation/36126_s128_c_64',
         # 'clusters/increasing_variation/36126_s128_c_128',
         # 'clusters/increasing_variation/36096_s64_c_64/images'
         # 'clusters/z_samples/latent_neighbors_direction10'
         # 'clusters/00068_128/images',
-    ]
 
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/green_waves_s128_c_64',
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/cobbles_s128_c_64'
+    ]
+    pool = 128
+    stride = 128
     losses = [
         # L2(batch_reduction='none'),
+        # GradLoss(batch_reduction='none'),
+        # SimplePatchLoss(patch_size=11, sigma=0.02, batch_reduction='none'),
+        # PatchRBFLoss(patch_size=3, sigma=0.06),
+        # PatchRBFLoss(patch_size=7, sigma=0.04),
+        # PatchRBFLoss(patch_size=11, sigma=0.02),
+        # # GaborPerceptualLoss(pool_window=pool, pool_stride=stride),
+        # # MMD_PP(r=128, normalize_patch='channel_mean'),
+        # LossesList([
+        #     PatchRBFLoss(patch_size=3, sigma=0.06),
+        #     PatchRBFLoss(patch_size=7, sigma=0.04),
+        #     PatchRBFLoss(patch_size=11, sigma=0.02),
+        # ], weights=[0.2, 0.4, 0.4], name='3+7+11'),
+        # LossesList([
+        #     GradLoss(),
+        #     WindowLoss(PatchMMDLoss(patch_size=11, n_samples=256, sigmas=[0.02]), window_size=pool, stride=stride),
+        # ], weights=[0.1, 0.9], name='grad+win_MMD'),
         GradLoss(batch_reduction='none'),
-        PatchRBFLoss(patch_size=11, sigma=0.02),
-        MMDApproximate(),
+        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=512, sigmas=[0.02]), window_size=pool, stride=stride),
+        # LossesList([
+        #     GradLoss(batch_reduction='none'),
+        #     WindowLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sigmas=[0.02]), window_size=pool, stride=stride),
+        # ], weights=[0.1, 0.9], name='patchloss+win_MMD'),
+        LossesList([
+            GradLoss(batch_reduction='none'),
+            MMDApproximate(patch_size=11, pool_size=pool, pool_strides=stride, sigma=0.02, r=128, normalize_patch='channel_mean'),
+        ], weights=[0.1, 0.9], name='patchloss+win_MMD'),
 
-        MMD_PP(r=128, normalize_patch='channel_mean'),
-        MMD_PPP(r=128, normalize_patch='channel_mean'),
-        VGGPerceptualLoss(pretrained=True),
-        VGGPerceptualLoss(pretrained=False),
-        VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True),
+        # LossesList([
+        #     WindowLoss(PatchMMDLoss(patch_size=5, n_samples=None, sigmas=[0.05]), window_size=pool, stride=stride),
+        #     WindowLoss(PatchMMDLoss(patch_size=11, n_samples=None, sigmas=[0.02]), window_size=pool, stride=stride),
+        # ], weights=[0.4, 0.6], name='patchloss+win_MMD')
+
+        # MMDApproximate(patch_size=11, pool_size=pool, pool_strides=stride, sigma=0.02, r=1024),
+        # PyramidLoss(
+        #     WindowLoss(PatchMMDLoss(patch_size=11, n_samples=256, sigmas=[0.02]), window_size=pool, stride=stride),
+        # )
+        # LossesList([
+        #     GradLoss(),
+        #     MMDApproximate(patch_size=11, pool_size=pool, pool_strides=stride, sigma=0.02, r=128),
+        # ], weights=[0.1, 0.9], name='grad+win_MMD-approx')
+        # VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1.0)]),
+        # VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1.0), ('conv5_3', 1.0)]),
+        # VGGPerceptualLoss(pretrained=False, reinit=True, layers_and_weights=[('conv1_2', 1.0)])
     ]
 
-    num_images = 12
-    start_mode = 'mean'
+    num_images = 1
+    lr = 0.01
+    n_steps = 300
+    start_mode = 'noise+blur'
     root = f'outputs/{num_images}_{start_mode}'
     tag = f""
 
     plotter = Plotter(len(losses), len(image_dirs))
-    fig, axs = plt.subplots(len(image_dirs), len(losses) + 1, figsize=(3 + 3 * len(losses), 3 * len(image_dirs)))
 
-    grad_criterion = GradLoss(batch_reduction='none')
+    # grad_criterion = GradLoss(batch_reduction='none')
 
     # RUN OPTIMIZATION AND MAIN PLOT
     for i, images_dir in enumerate(image_dirs):
@@ -208,24 +240,25 @@ def batch_run():
         plotter.set_result(i, 0, pt2cv(starting_img.detach().cpu().numpy()), 'Starting img')
         for j, loss in enumerate(losses):
             output_dir = os.path.join(root, images_name, loss.name)
-            img = optimize_for_mean(starting_img.clone(), images, loss, output_dir, num_steps=200, lr=0.1)
+            img = optimize_for_mean(starting_img.clone(), images, loss, output_dir, num_steps=n_steps, lr=lr)
             vutils.save_image(img, os.path.join(root, images_name, f"{loss.name}.png"), normalize=True)
 
             swd_score = compute_lap_swd(img.repeat(len(images), 1, 1, 1), images.to(device), device='cpu', return_by_resolution=True)
-            grad_loss = grad_criterion(img.repeat(len(images), 1, 1, 1), images.to(device))
+            # grad_loss = grad_criterion(img.repeat(len(images), 1, 1, 1), images.to(device))
             title = f"{loss.name}" \
                     f"\nSWD:{swd_score.mean():.1f}" \
-                    f"\nGradLoss min: {grad_loss.min():.3f}" \
-                    f"\nGradLoss avg: {grad_loss.mean():.3f}"
-            plotter.set_result(i, j+1, pt2cv(img.detach().cpu().numpy()), title)
+                    # f"\nGradLoss min: {grad_loss.min():.3f}" \
+                    # f"\nGradLoss avg: {grad_loss.mean():.3f}"
+            # title = loss.name
+            plotter.set_result(i, j + 1, pt2cv(img.detach().cpu().numpy()), title)
 
         plotter.input_images.append(images)
 
     plotter.save_fig(os.path.join(root, f"{tag}_results.png"))
 
-
     # SAVE INPUTS FOR REFERENCE
     vutils.save_image(torch.cat(plotter.input_images), os.path.join(root, f"{tag}_inputs.png"), normalize=True, nrow=num_images)
+
 
 if __name__ == '__main__':
     batch_run()

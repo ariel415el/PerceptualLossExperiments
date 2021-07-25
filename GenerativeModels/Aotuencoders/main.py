@@ -13,7 +13,7 @@ from losses.classic_losses.l2 import L1, L2
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
 from losses.composite_losses.list_loss import LossesList
 from losses.experimental_patch_losses import MMD_PP
-from losses.classic_losses.grad_loss import GradLoss
+from losses.classic_losses.grad_loss import GradLoss, GradLoss3Channels
 from losses.mmd.windowed_patch_mmd import MMDApproximate
 from losses.patch_loss import PatchRBFLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
@@ -42,24 +42,22 @@ def train_autoencoder(dataset_name, train_name, tag):
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
     encoder.apply(weights_init)
-    # encoder.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/encoder.pth'))
 
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim)
     generator.apply(weights_init)
-    # generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/Aotuencoders/outputs/ffhq_128/L1/generator.pth'))
 
-    # Define the loss criterion
-    # criterion = L2()
-    # criterion = MMD_PP(r=64)
-    # criterion = LossesList([
-    #     L1(),
-    #     GradLoss()
-    # ], weights=[0.001,1])
-
-    # criterion = VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv1_2', 1.0)])
     # criterion = VGGPerceptualLoss(pretrained=True)
-    criterion = VGGPerceptualLoss(pretrained=False, reinit=True, layers_and_weights=[('conv1_2', 1.0)])
-    # criterion = MMDApproximate(patch_size=11, sigma=0.02, pool_size=32, pool_strides=16, r=64, normalize_patch='channel_mean')
+
+    from losses.composite_losses.window_loss import WindowLoss
+    from losses.mmd.patch_mmd import PatchMMDLoss
+    criterion = GradLoss3Channels()
+
+    # criterion = LossesList([
+    #     GradLoss(),
+    #     L2(),
+    #     # MMDApproximate(patch_size=11, pool_size=32, pool_strides=16, sigma=0.02, r=128, normalize_patch='channel_mean'),
+    #     # PatchRBFLoss(patch_size=11, sigma=0.02),
+    # ], weights=[0.8, 0.2], name='0.8Grad+0.2L2')
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     trainer = AutoEncoderTraniner(default_config, encoder, generator, criterion, train_dataset, device)
@@ -137,7 +135,7 @@ def evaluate_generator(outputs_dir):
                   device)
 
 if __name__ == '__main__':
-    train_name = f"ffhq_128_exp"
-    train_autoencoder('ffhq', train_name, 'VGG-only-first-layer')
+    train_name = f"ffhq_128_exps"
+    train_autoencoder('ffhq', train_name, '')
     # train_latent_samplers('outputs/ffhq_128/VGG-None_PT')
     # evaluate_generator('outputs/test/VGG-None_PT')

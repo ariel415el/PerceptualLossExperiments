@@ -14,7 +14,7 @@ def get_gaussian_pyramid(img, max_levels=5):
 
 
 class PyramidLoss(nn.Module):
-    def __init__(self, metric, max_levels=3, weightening_mode=0):
+    def __init__(self, metric, max_levels=2, weightening_mode=0):
         super(PyramidLoss, self).__init__()
         self.max_levels = max_levels
         self.metric = metric

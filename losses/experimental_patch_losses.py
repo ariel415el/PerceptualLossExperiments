@@ -126,6 +126,11 @@ class EngeneeredPerceptualLoss(torch.nn.Module):
 
 
 class SimplePatchLoss(torch.nn.Module):
+    """
+    Minimize gaussian distance over spatially matching patches of two images.
+    RBf forces the patches to be exactly like the optimized image. As sigma gets closer, any deviation leads immediatly
+        to a higher loss. In other words, averaging is not the way to go here
+    """
     def __init__(self, patch_size=3, sigma=0.06, batch_reduction='none'):
         super(SimplePatchLoss, self).__init__()
         self.kernels = torch.ones((1, 3, patch_size, patch_size), dtype=torch.float32)
@@ -135,11 +140,35 @@ class SimplePatchLoss(torch.nn.Module):
         self.name = f'simplePatchLoss(p={patch_size},s={sigma})'
 
     def forward(self, x, y):
-        pixel_diff = (x-y)**2
-        patch_diff = conv2d(pixel_diff, self.kernels.to(x.device))
-        patch_rbf = 1 -1 * (patch_diff / (-1 * self.sigma)).exp()
-        loss = torch.mean(patch_rbf, dim=(1, 2, 3))
+        patches_l2_norm = conv2d((x-y)**2, self.kernels.to(x.device))
+        patch_rbf_dist = 1 - 1 * (patches_l2_norm / (-1 * self.sigma)).exp()
+        loss = torch.mean(patch_rbf_dist, dim=(1, 2, 3))
         if self.batch_reduction == 'mean':
             return loss.mean()
         else:
             return loss.view(x.shape[0], -1).mean(1)
+
+if __name__ == '__main__':
+
+    loss = SimplePatchLoss(11, sigma=0.02)
+    img = cv2.imread('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/green_waves.jpg')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (128,128))
+    img = img.astype(np.float64) / 255.
+    img = img * 2 - 1
+    img = torch.from_numpy(img.transpose(2, 0, 1)).float()
+
+    x = torch.zeros((1, 3, 128, 128))
+    y = torch.zeros((1, 3, 128, 128))
+
+    patch = img[:, 20:32, 20:32]
+    print(patch.shape)
+    x[0, :, 50:62, 50:62] = patch
+    # y[0, :, 70:82, 70:82] = patch
+
+    loss(x,y)
+
+    # import torchvision.utils as vutils
+    # vutils.save_image(x, f"x.png", normalize=True)
+    # vutils.save_image(y, f"y.png", normalize=True)
+

@@ -10,12 +10,14 @@ MMD++:                                       0.74/3.03e-08
 MMD+++:                                      0.71/5.097e-08
 LapSWD:                                      0.73/3.79e-07
 VGG(M-l1):                                   0.689/0.00
-VGG(reinit_M-l1):                            0.690/0.00
-VGG(_PT_M-l1):                               0.72/0.0
-VGG(_reinit_NormFC_M-l1):                    0.72/7.79e-07
-VGG(_PT_M-l2):                               0.72/0.0
-VGG(_PT_M-gram):                             0.79/0.0
-VGG(_PT_M-gram_trace):                       0.79/0.0
-VGG(_PT_M-cx):                               0.80/0.00
-VGG(_PT_M-swd):                              0.77/0.00
-Windowed(w-32-8)-PatchSWD(p-3-1):            0.72/0.00criterion: mean/std
+VGG(reinit):                                 0.690/0.00
+VGG(PT):                                     0.72/0.0
+VGG(NormFC):                                 0.731/0.00
+VGG(reinit_NormFC):                          0.72/7.79e-07
+VGG(PT):                                     0.72/0.0
+VGG(PT_M-gram):                              0.79/0.0
+VGG(PT_M-gram_trace):                        0.79/0.0
+VGG(PT_M-cx):                                0.80/0.00
+VGG(PT_M-swd):                               0.77/0.00
+Windowed(w-32-8)-PatchSWD(p-3-1):            0.72/0.00
+

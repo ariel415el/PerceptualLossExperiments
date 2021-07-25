@@ -22,3 +22,7 @@
 /Experiments/style_synthesis
 /Experiments/gradient_comparisons
 /Experiments/optimize_model
+
+
+/losses/gabor_loss/*.pth
+/losses/gabor_loss/*.png

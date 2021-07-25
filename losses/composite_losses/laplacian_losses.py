@@ -111,7 +111,7 @@ def minibatch_laplacian_pyramid(image, n_pyramids, batch_size, device="cpu"):
 
 
 class LaplacyanLoss(nn.Module):
-    def __init__(self, metric, max_levels=3, k_size=5, sigma=1.0, weightening_mode=0):
+    def __init__(self, metric, max_levels=2, k_size=5, sigma=1.0, weightening_mode=0):
         super(LaplacyanLoss, self).__init__()
         self.max_levels = max_levels
         self._gauss_kernel = get_kernel_gauss(size=k_size, sigma=sigma, n_channels=3)

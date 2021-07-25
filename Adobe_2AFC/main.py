@@ -56,9 +56,9 @@ def score_2afc_dataset(data_loader, func, name=''):
 def main():
     criterions = [
         # MMD_PP(batch_reduction='none'),
-        VGGPerceptualLoss(pretrained=False, batch_reduction='none'),
-        VGGPerceptualLoss(pretrained=False, reinit=True, batch_reduction='none'),
-        VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, batch_reduction='none')
+        # VGGPerceptualLoss(pretrained=False, batch_reduction='none'),
+        # VGGPerceptualLoss(pretrained=False, reinit=True, batch_reduction='none'),
+        VGGPerceptualLoss(pretrained=False, reinit=False, norm_first_conv=True, batch_reduction='none')
         # MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
         # MMDApproximate(patch_size=3, sigma=0.1, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
         # MMDApproximate(patch_size=3, sigma=0.06, pool_size=16, pool_strides=8, r=64, batch_reduction='none', normalize_patch='channel_mean'),

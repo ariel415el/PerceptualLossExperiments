@@ -52,9 +52,8 @@ class AutoEncoderTraniner:
 
                 self.optimizerE.step()
                 self.encoder.zero_grad()
-                if self.step % self.params.num_z_steps == 0:
-                    self.optimizerG.step()
-                    self.generator.zero_grad()
+                self.optimizerG.step()
+                self.generator.zero_grad()
 
             if self.epoch % vis_freq == 0:
                 self._visualize(self.epoch, self.dataloader.dataset, outptus_dir)
@@ -80,6 +79,7 @@ class AutoEncoderTraniner:
                     'epoch': self.epoch,
                     'loss_means': self.loss_means},
                     f"{folder_path}/train_state.pth")
+        self.params.save(f"{folder_path}/config.pth")
 
     def _load_ckpt(self, folder_path):
         self.encoder.load_state_dict(torch.load(f"{folder_path}/encoder.pth"))

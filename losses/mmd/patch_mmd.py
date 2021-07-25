@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from losses.composite_losses.compare_patch_distribution import PatchdistributionsLoss
@@ -14,14 +15,16 @@ def get_distance_matrix(X):
 
 def multi_bandwitdh_rbf_kernel(X, S, sigmas=None):
     if sigmas is None:
-        sigmas = [2, 5, 10, 20, 40, 80]  # 1/x = [0.5   , 0.2   , 0.1   , 0.05  , 0.025 , 0.0125]
+        sigmas = [2, 5, 10, 20, 40, 80]
+        # sigmas = [0.5, 0.2, 0.1, 0.05, 0.025, 0.0125]
     squared_l2_dist_mat = get_distance_matrix(X)
     loss = 0
-    for v in sigmas:
-        rbf_gram_matrix = torch.exp(squared_l2_dist_mat / (-2 * v))
+    for s in sigmas:
+        rbf_gram_matrix = torch.exp(squared_l2_dist_mat / (-2 * s**2))
         # rbf_gram_matrix = torch.exp(1.0 / v * squared_l2_dist_mat)
         loss += torch.sum(S * rbf_gram_matrix)
-    return torch.sqrt(loss)
+    # return torch.sqrt(loss)
+    return loss
 
 
 def dot_product_kernel(X, S):
@@ -41,8 +44,7 @@ def get_scale_matrix(M, N):
     return torch.matmul(s, s.t())
 
 
-def compute_MMD(x, y, sigmas=None):
-
+def compute_MMD(x, y, sigmas):
     # Compute signed scale matrix to sum up the right entries in the gram matrix for MMD loss
     M = x.size()[0]
     N = y.size()[0]
@@ -53,13 +55,15 @@ def compute_MMD(x, y, sigmas=None):
 
 
 class PatchMMDLoss(torch.nn.Module):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, sigmas=None, batch_reduction='mean', normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, sigmas=None,
+                 batch_reduction='mean', normalize_patch='none'):
         super(PatchMMDLoss, self).__init__()
-        patch_metric = lambda x,y: compute_MMD(x, y, sigmas)
+        if sigmas == None:
+            sigmas = [0.1, 0.05, 0.025, 0.01]
+        sigmas = np.array(sigmas) * patch_size**2
+        patch_metric = lambda x, y: compute_MMD(x, y, sigmas)
         self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations, batch_reduction, normalize_patch)
         self.name = f"PatchMMD(p-{patch_size}-{stride})"
 
     def forward(self, x, y):
         return self.loss(x, y)
-
-
