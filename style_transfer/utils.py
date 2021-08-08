@@ -82,3 +82,19 @@ def calc_TV_Loss(x):
     tv_loss = torch.mean(torch.abs(x[:, :, :, :-1] - x[:, :, :, 1:]))
     tv_loss += torch.mean(torch.abs(x[:, :, :-1, :] - x[:, :, 1:, :]))
     return tv_loss
+
+def prepare_result_dir(output_dir):
+    # Create results directory
+    from time import strftime, localtime
+
+    conf.output_dir_path += '/' + conf.name + strftime('_%b_%d_%H_%M_%S', localtime())
+    os.makedirs(conf.output_dir_path)
+
+    # Put a copy of all *.py files in results path, to be able to reproduce experimental results
+    if conf.create_code_copy:
+        local_dir = os.path.dirname(__file__)
+        for py_file in glob.glob(local_dir + '/*.py'):
+            copy(py_file, conf.output_dir_path)
+        if conf.resume:
+            copy(conf.resume, os.path.join(conf.output_dir_path, 'starting_checkpoint.pth.tar'))
+    return conf.output_dir_path

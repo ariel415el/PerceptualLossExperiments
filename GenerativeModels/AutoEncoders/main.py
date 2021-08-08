@@ -6,9 +6,17 @@ import torch.utils.data
 import torchvision.utils as vutils
 
 import sys
+sys.path.append(os.path.realpath(".."))
 
 from GenerativeModels.models import weights_init
 from GenerativeModels.utils.test_utils import run_FID_tests, run_swd_tests
+from GenerativeModels.AutoEncoders.autoencoder import AutoEncoderTraniner
+from GenerativeModels.GLO.IMLE import IMLE
+from GenerativeModels.config import default_config
+from GenerativeModels.GLO.utils import NormalSampler, MappingSampler
+from GenerativeModels.utils.data_utils import get_dataset, get_dataloader, read_lfw_data
+from GenerativeModels import models
+
 from losses.classic_losses.l2 import L1, L2
 from losses.composite_losses.laplacian_losses import LaplacyanLoss
 from losses.composite_losses.list_loss import LossesList
@@ -17,20 +25,31 @@ from losses.classic_losses.grad_loss import GradLoss, GradLoss3Channels
 from losses.mmd.windowed_patch_mmd import MMDApproximate
 from losses.patch_loss import PatchRBFLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
+from losses.SSIM_1 import SSIM
+from losses.swd.patch_swd import PatchSWDLoss
 
-sys.path.append(os.path.realpath("../.."))
-from GenerativeModels.Aotuencoders.autoencoder import AutoEncoderTraniner
-from GenerativeModels.GLO.IMLE import IMLE
-from GenerativeModels.config import default_config
-from GenerativeModels.GLO.utils import NormalSampler, MappingSampler
-from GenerativeModels.utils.data_utils import get_dataset, get_dataloader, read_lfw_data
-from GenerativeModels import models
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 # device = torch.device("cpu")
 
+
+def copy_files(outputs_dir):
+    import glob
+    from shutil import copy
+    import os
+    code_dir = os.path.join(outputs_dir, "code_copy")
+    os.makedirs(code_dir, exist_ok=True)
+    local_dir = os.path.dirname(os.path.dirname(__file__))
+    all_files = glob.glob(local_dir + '/**/*.py', recursive=True)
+    all_files_targets = [x.replace(local_dir + "/", '') for x in all_files]
+    for py_file, py_target in zip(all_files, all_files_targets):
+        py_target = os.path.join(outputs_dir, "code_copy", py_target)
+        parent_dir = os.path.dirname(py_target)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+        copy(py_file, py_target)
 
 def train_autoencoder(dataset_name, train_name, tag):
     params = default_config
@@ -42,24 +61,34 @@ def train_autoencoder(dataset_name, train_name, tag):
     # define the generator
     encoder = models.DCGANEncoder(params.img_dim, params.channels, params.z_dim)
     encoder.apply(weights_init)
+    # encoder.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/AutoEncoders/outputs/ffhq_128/L2/encoder.pth'))
 
     generator = models.DCGANGenerator(params.z_dim, params.channels, params.img_dim)
     generator.apply(weights_init)
+    # generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/AutoEncoders/outputs/ffhq_128/L2/generator.pth'))
 
     # criterion = VGGPerceptualLoss(pretrained=True)
 
     from losses.composite_losses.window_loss import WindowLoss
     from losses.mmd.patch_mmd import PatchMMDLoss
-    criterion = GradLoss3Channels()
+    # criterion = GradLoss3Channels()
+    criterion = MMD_PP(r=64, pool_size=128, pool_strides=1)
+    criterion.name = f'MMD_PP(128:1)'
+    # criterion = PatchRBFLoss(patch_size=11, sigma=0.02)
+    # criterion = L2()
+    criterion = LossesList([
+        L2(),
+        PatchRBFLoss(patch_size=3, sigma=0.1),
+        MMDApproximate(patch_size=5, pool_size=128, pool_strides=1, sigma=0.05, r=64, normalize_patch='channel_mean'),
+        MMDApproximate(patch_size=11, pool_size=128, pool_strides=1, sigma=0.02, r=64, normalize_patch='channel_mean'),
+    ], weights=[0.001, 0.05, 1.0, 1.0])
 
-    # criterion = LossesList([
-    #     GradLoss(),
-    #     L2(),
-    #     # MMDApproximate(patch_size=11, pool_size=32, pool_strides=16, sigma=0.02, r=128, normalize_patch='channel_mean'),
-    #     # PatchRBFLoss(patch_size=11, sigma=0.02),
-    # ], weights=[0.8, 0.2], name='0.8Grad+0.2L2')
+    # criterion = SSIM(nonnegative_ssim=False)
+    # criterion = PatchRBFLoss(patch_size=11, sigma=0.02,normalize_patch='channel_mean')
+    # criterion = MMDApproximate(patch_size=3, pool_size=5, pool_strides=2, sigma=0.06, r=64, batch_reduction='none', name='MMDApprox(p=11,w=16:8)')
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
+    copy_files(outptus_dir)
     trainer = AutoEncoderTraniner(default_config, encoder, generator, criterion, train_dataset, device)
     # trainer._load_ckpt(outptus_dir)
     trainer.train(outptus_dir, epochs=default_config.num_epochs)
@@ -135,7 +164,7 @@ def evaluate_generator(outputs_dir):
                   device)
 
 if __name__ == '__main__':
-    train_name = f"ffhq_128_exps"
+    train_name = f"ffhq_128_z256"
     train_autoencoder('ffhq', train_name, '')
     # train_latent_samplers('outputs/ffhq_128/VGG-None_PT')
     # evaluate_generator('outputs/test/VGG-None_PT')

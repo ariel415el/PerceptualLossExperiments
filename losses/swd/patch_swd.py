@@ -24,7 +24,7 @@ class PatchSWDLoss(torch.nn.Module):
         super(PatchSWDLoss, self).__init__()
         patch_metric = lambda x,y: compute_swd(x,y, num_proj)
         self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations, batch_reduction)
-        self.name = f"PatchSWD(p-{patch_size}-{stride})"
+        self.name = f"PatchSWD(p-{patch_size}:{stride})"
 
     def forward(self, x, y):
         return self.loss(x, y)

@@ -8,11 +8,11 @@ from losses.swd.patch_swd import compute_swd
 from losses.vgg_loss.contextual_loss import contextual_loss
 from losses.vgg_loss.gram_loss import gram_loss, gram_trace_loss
 
-layer_names = ['conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'AP1',
-               'conv2_1', 'relu2_1', 'conv2_2', 'relu2_2', 'AP2',
-               'conv3_1', 'relu3_1', 'conv3_2', 'relu3_2', 'conv3_3', 'relu3_3', 'AP3',
-               'conv4_1', 'relu4_1', 'conv4_2', 'relu4_2', 'conv4_3', 'relu4_3', 'AP4',
-               'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'AP5', ]
+layer_names = ['conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'MP1',
+               'conv2_1', 'relu2_1', 'conv2_2', 'relu2_2', 'MP2',
+               'conv3_1', 'relu3_1', 'conv3_2', 'relu3_2', 'conv3_3', 'relu3_3', 'MP3',
+               'conv4_1', 'relu4_1', 'conv4_2', 'relu4_2', 'conv4_3', 'relu4_3', 'MP4',
+               'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'MP5', ]
 
 
 def layer_names_to_indices(names):
@@ -104,7 +104,7 @@ class VGGFeatures(nn.Module):
         for i, f in enumerate(self.features[:max_layer + 1]):
             z = f(z)
             if i in layer_indices:
-                activations[layer_names[i]] = z
+                activations[layer_names[i]] = z.clone()
             if i == max_layer:
                 break
         return activations
@@ -143,7 +143,7 @@ class VGGPerceptualLoss(nn.Module):
         loss = 0
         for layer_name, w in self.layers_and_weights:
             loss += self.features_metric(fx[layer_name], fy[layer_name]) * w
-
+        loss /= len(self.layers_and_weights)
         if self.batch_reduction == 'mean':
             return loss.mean()
         else:

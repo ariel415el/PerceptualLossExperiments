@@ -25,7 +25,7 @@ def apply_ditribution_metric_to_patches(x, y, dist_metric, patch_size, stride, n
     if n_samples:
         indices = torch.randperm(x_patches.shape[1])[:n_samples]
         x_patches = x_patches[:, indices]
-        if sample_same_locations:
+        if not sample_same_locations:
             indices = torch.randperm(y_patches.shape[1])[:n_samples]
         y_patches = y_patches[:, indices]
 
@@ -52,6 +52,7 @@ class PatchdistributionsLoss(torch.nn.Module):
                                                       patch_size=self.patch_size,
                                                       stride=self.stride,
                                                       n_samples=self.n_samples,
+                                                      sample_same_locations=self.sample_same_locations,
                                                       normalize_patch=self.normalize_patch)
         # results *= 1e3
         if self.batch_reduction == 'mean':

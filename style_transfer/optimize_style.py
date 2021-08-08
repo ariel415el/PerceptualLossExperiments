@@ -3,9 +3,10 @@ import os
 
 from matplotlib import pyplot as plt
 
-from losses.vgg_loss.vgg_loss import VGGFeatures, get_features_metric, layer_names_to_indices
 from style_transfer.utils import imload, imsave, calc_loss, calc_TV_Loss
 from tqdm import tqdm
+
+from losses.vgg_loss.vgg_loss import VGGFeatures, get_features_metric, layer_names_to_indices
 
 
 def style_mix_optimization(content_img_path, style_img_path, loss_network, style_weight, lr, max_iter, save_path, device):
@@ -19,7 +20,8 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, style
 
     # target_img = torch.randn(content_image.shape).to(device).float() * 0.5
     # target_img = content_image.clone()
-    target_img = torch.ones(style_image.shape).to(device) * torch.mean(style_image.clone(), dim=(2,3), keepdim=True) + torch.randn(content_image.shape).to(device).float() * 0.01
+    target_img = torch.ones(style_image.shape).to(device) * torch.mean(style_image.clone(), dim=(2,3), keepdim=True) + torch.randn(content_image.shape).to(device).float() * 0.2
+    # target_img = torch.zeros(style_image.shape).to(device)
     # target_img = torch.mean(content_image.clone(), dim=(2,3), keepdim=True)
     target_img.requires_grad_(True)
 
@@ -34,7 +36,7 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, style
     pbar = tqdm(range(max_iter + 1))
     for iteration in pbar:
         if iteration % 500 == 0:
-            imsave(target_img.cpu(), os.path.join(save_path, f"iter-{iteration}.png"))
+            imsave(target_img.cpu().clamp(-1,1), os.path.join(save_path, f"iter-{iteration}.png"))
             plt.plot(range(len(losses)), losses)
             plt.savefig(os.path.join(save_path+".png"))
             plt.clf()
@@ -48,7 +50,7 @@ def style_mix_optimization(content_img_path, style_img_path, loss_network, style
         # style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('swd'))
         style_loss = calc_loss(style_activations, target_style_activations, get_features_metric('gram'))
 
-        total_loss = content_loss + style_loss# * style_weight # + calc_TV_Loss(target_img)
+        total_loss = style_loss# * style_weight # + calc_TV_Loss(target_img)
 
         # target_img.data.clamp_(-1, 1)
         optimizer.zero_grad()
@@ -73,7 +75,9 @@ if __name__ == '__main__':
     style_weight = 1
     content_layers = []
     # style_layers = ['conv1_2', 'conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
-    style_layers = ['conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3','conv5_1', 'conv5_2', 'conv5_3']
+    style_layers = ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3', 'relu5_3']
+    # style_layers = ['conv2_2', 'conv3_3', 'conv4_3', 'conv5_3']
+    # style_layers = ['conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3','conv5_1', 'conv5_2', 'conv5_3']
     # style_weight = 1000000
     # content_layers = ['conv2_2']
     # style_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1']
@@ -85,7 +89,9 @@ if __name__ == '__main__':
     # loss_network = VGGFeatures(pretrained=True).to(device)
 
     tag = 'swd'
-    style_img_path = 'imgs/style/green_waves.jpg'
+    style_img_path = '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/perceptual_mean_optimization/clusters/textures/ball-on-grass_e-7_z-0.2/0.png'
+    # style_img_path = 'imgs/content/chicago.jpg'
+
     style_img_name = os.path.splitext(os.path.basename(style_img_path))[0]
     content_img_path = 'imgs/content/chicago.jpg'
     content_img_name = os.path.splitext(os.path.basename(content_img_path))[0]

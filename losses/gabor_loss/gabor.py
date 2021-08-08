@@ -50,10 +50,10 @@ class GaborPerceptualLoss(torch.nn.Module):
     def __init__(self, pool_window=128, pool_stride=1, batch_reduction='none'):
         super(GaborPerceptualLoss, self).__init__()
         # self.kernels = get_gabors_cv(kernel_size=11)
-        # self.kernels = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alexnet_1_weights.pth'))
-        # self.biases = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alexnet_1_biases.pth'))
-        self.kernels = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vgg_1_weight.pth'))
-        self.biases = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vgg_1_biases.pth'))
+        self.kernels = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alexnet_1_weights.pth'))
+        self.biases = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alexnet_1_biases.pth'))
+        # self.kernels = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vgg_1_weight.pth'))
+        # self.biases = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vgg_1_biases.pth'))
         self.non_linearity = torch.nn.ReLU()
         # self.non_linearity = lambda x: x
         self.pool = torch.nn.AvgPool2d(pool_window, pool_stride)
@@ -66,8 +66,8 @@ class GaborPerceptualLoss(torch.nn.Module):
         # y = torch.mean(y, dim=1, keepdim=True)
         self.kernels = self.kernels.to(x.device)
         self.biases = self.biases.to(x.device)
-        x_features = self.pool(self.non_linearity(conv2d(x, self.kernels, padding=1)))#, bias=self.biases)))
-        y_features = self.pool(self.non_linearity(conv2d(y, self.kernels, padding=1)))#, bias=self.biases)))
+        x_features = self.pool(self.non_linearity(conv2d(x, self.kernels, padding=0)))#, bias=self.biases)))
+        y_features = self.pool(self.non_linearity(conv2d(y, self.kernels, padding=0)))#, bias=self.biases)))
         dist = (x_features - y_features).pow(2)
         if self.batch_reduction == 'mean':
             return dist.mean()

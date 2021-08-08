@@ -8,7 +8,7 @@
 
 /GenerativeModels/GLO/outputs
 /GenerativeModels/GMMN/outputs
-/GenerativeModels/Aotuencoders/outputs
+/GenerativeModels/AutoEncoders/outputs
 /GenerativeModels/Experiments_outputs
 /style_transfer/outputs
 /style_transfer/imgs
@@ -19,10 +19,12 @@
 /Experiments/trained_models
 /Experiments/test_swd
 /Experiments/latent_neighbors_sets
-/Experiments/style_synthesis
+/image_retargeting/style_synthesis
 /Experiments/gradient_comparisons
 /Experiments/optimize_model
-
+/Experiments/box_dataset
+/image_retargeting/images
+image_retargeting/optimized_images_outputs
 
 /losses/gabor_loss/*.pth
 /losses/gabor_loss/*.png

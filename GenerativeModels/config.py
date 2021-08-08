@@ -17,7 +17,7 @@ class config:
 default_config = config()
 default_config.img_dim = 128
 default_config.channels = 3
-default_config.z_dim = 64
+default_config.z_dim = 256
 
 default_config.lr = 0.001
 default_config.decay_epochs = 25

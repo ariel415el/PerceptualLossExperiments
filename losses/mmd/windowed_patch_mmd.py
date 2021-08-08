@@ -46,7 +46,8 @@ class MMDApproximate(torch.nn.Module):
                  batch_reduction='mean',
                  spatial_reduction='mean',
                  pad_image=True,
-                 normalize_patch='none'):
+                 normalize_patch='none',
+                 name=None):
         super(MMDApproximate, self).__init__()
         self.r = r
         self.pool_size = pool_size
@@ -69,7 +70,7 @@ class MMDApproximate(torch.nn.Module):
 
         self.padding = self.ksize // 2 if pad_image else 0
 
-        self.name = f"MMD-prox(p={patch_size},win={pool_size}:{pool_strides},rf={r},s={sigma})"
+        self.name = f"MMD-prox(p={patch_size},win={pool_size}:{pool_strides},rf={r},s={sigma})" if name is None else name
 
     def get_activations(self, x):
         if self.padding > 0:

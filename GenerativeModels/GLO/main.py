@@ -8,7 +8,9 @@ from GenerativeModels.GLO.IMLE import IMLE
 from GenerativeModels.config import default_config
 import sys
 
+from losses.composite_losses.pyramid_loss import PyramidLoss
 from losses.experimental_patch_losses import MMD_PP
+from losses.mmd.windowed_patch_mmd import MMDApproximate
 
 sys.path.append(os.path.realpath("../.."))
 from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
@@ -37,7 +39,7 @@ def train_GLO(dataset_name, train_name, tag):
     # criterion = SWD_PPP()
     # criterion = PatchRBFLoss(patch_size=19, sigma=0.01, pad_image=True)
     # criterion = LaplacyanLoss(PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True), weightening_mode=3, max_levels=2)
-    criterion = MMD_PP(r=128)
+    criterion = PyramidLoss(MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean'), max_levels=3, weightening_mode=1)
 
     # criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True,
     #             layers_and_weights=[('conv1_2', 0.1), ('conv2_2', 4.0), ('conv3_3', 8.0), ('conv4_3', 8.0),('conv5_3', 3.0)])

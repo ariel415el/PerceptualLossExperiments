@@ -164,9 +164,9 @@ def compare_trained_generators_losses(models_dir):
 
     # crop_coords = [16,-16,16,-16]
     # crop_coords = [24,-24,24,-24]
-    crop_coords = [10, 74, 10, 74]
+    # crop_coords = [10, 74, 10, 74]
     # crop_coords = [0,64,0,64]
-    # crop_coords = [0,-1,0,-1]
+    crop_coords = [0,-1,0,-1]
     # crop_coords = [32, -32, 32, -32]
     # crop_coords = [64, -32, 48, -48]
     # crop_coords = [48, -48, 48, -48]
@@ -188,8 +188,7 @@ def compare_trained_generators_losses(models_dir):
 
     ref_images, recs_dict = crop(ref_images, recs_dict, crop_coords)
 
-    plot_loss_matrix(criterions, ref_images, recs_dict,
-                     save_path=os.path.join(outputs_dir, f"lossMat.png"))
+    plot_loss_matrix(criterions, ref_images, recs_dict, save_path=os.path.join(outputs_dir, f"lossMat.png"))
 
     plot_losses_images(criterions, ref_images, recs_dict, os.path.join(outputs_dir, f"images"))
 
