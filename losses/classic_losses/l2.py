@@ -14,6 +14,21 @@ class L2(torch.nn.Module):
         else:
             return dists.view(x.shape[0], -1).mean(1)
 
+
+class LP(torch.nn.Module):
+    def __init__(self, p=0.5,  batch_reduction='mean'):
+        super(LP, self).__init__()
+        self.name = f'L-{p}'
+        self.p = p
+        self.batch_reduction = batch_reduction
+
+    def __call__(self, x, y):
+        dists = torch.abs(x - y).pow(self.p)
+        if self.batch_reduction == 'mean':
+            return dists.mean()
+        else:
+            return dists.view(x.shape[0], -1).mean(1)
+
 class L1(torch.nn.Module):
     def __init__(self, batch_reduction='mean'):
         super(L1, self).__init__()

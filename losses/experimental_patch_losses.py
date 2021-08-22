@@ -133,15 +133,16 @@ class SimplePatchLoss(torch.nn.Module):
     """
     def __init__(self, patch_size=3, sigma=0.06, batch_reduction='none'):
         super(SimplePatchLoss, self).__init__()
-        self.kernels = torch.ones((1, 3, patch_size, patch_size), dtype=torch.float32)
+        self.patch_summation_kernel = torch.ones((1, 3, patch_size, patch_size), dtype=torch.float32)
         self.pool = torch.nn.AvgPool2d(patch_size, 1)
         self.batch_reduction = batch_reduction
         self.sigma = sigma * patch_size**2
         self.name = f'simplePatchLoss(p={patch_size},s={sigma})'
 
     def forward(self, x, y):
-        patches_l2_norm = conv2d((x-y)**2, self.kernels.to(x.device))
-        patch_rbf_dist = 1 - 1 * (patches_l2_norm / (-1 * self.sigma)).exp()
+        pixel_diff = (x-y)**2
+        patch_l2_norm = conv2d(pixel_diff, self.patch_summation_kernel.to(x.device))
+        patch_rbf_dist = 1 - 1 * (patch_l2_norm / (-1 * self.sigma)).exp()
         loss = torch.mean(patch_rbf_dist, dim=(1, 2, 3))
         if self.batch_reduction == 'mean':
             return loss.mean()

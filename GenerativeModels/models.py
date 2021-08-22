@@ -14,6 +14,7 @@ def weights_init(m):
     elif classname.find('Emb') != -1:
         init.normal_(m.weight, mean=0, std=0.01)
 
+
 class DCGANGenerator(nn.Module):
     def __init__(self, input_dim, channels, output_img_dim=28):
         self.input_dim = input_dim
@@ -150,7 +151,6 @@ class MLPEncoder(nn.Module):
         validity = self.model(img_flat)
 
         return validity
-
 
 if __name__ == '__main__':
     ### Optimize the model to output a single specific image

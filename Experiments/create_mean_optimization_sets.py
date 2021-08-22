@@ -27,7 +27,7 @@ def sample_latent_neighbors(outputs_dir, models_dir):
         save_batch(neighbors, os.path.join(outputs_dir, os.path.basename(models_dir), f"data_neighbors{i}"))
 
 
-def center_crop_image_to_square(img, edge_perc=0.15):
+def center_crop_image_to_square(img, edge_perc=None):
     h = img.shape[0]
     w = img.shape[1]
     if h > w:

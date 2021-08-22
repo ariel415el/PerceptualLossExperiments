@@ -91,8 +91,8 @@ class MMDApproximate(torch.nn.Module):
         w, b = self._get_w_b(c)
         w = w.to(x.device)
         b = b.to(x.device)
-
         act_x = torch.cos(conv2d(x, w, b, self.strides))
+        self.pool = torch.nn.AvgPool2d(kernel_size=act_x.shape[2:], stride=1)
         x_feats = self.pool(act_x)
         act_y = torch.cos(conv2d(y, w, b, self.strides))
         y_feats = self.pool(act_y)

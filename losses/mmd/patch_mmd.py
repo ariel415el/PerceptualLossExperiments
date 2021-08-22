@@ -49,7 +49,8 @@ def compute_MMD(x, y, sigmas):
     M = x.size()[0]
     N = y.size()[0]
     S = get_scale_matrix(M, N).to(x.device)
-
+    # S[:N,:N] *= 0.9
+    # S[N:,N:] = 0
     # return dot_product_kernel(X, S)
     return multi_bandwitdh_rbf_kernel(torch.cat((x, y), 0), S, sigmas)
 

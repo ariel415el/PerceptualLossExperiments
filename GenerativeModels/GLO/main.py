@@ -8,12 +8,20 @@ from GenerativeModels.GLO.IMLE import IMLE
 from GenerativeModels.config import default_config
 import sys
 
+from GenerativeModels.models import weights_init
+from GenerativeModels.utils.test_utils import run_FID_tests
+from losses.classic_losses.l2 import L2
+from losses.classic_losses.lap1_loss import LapLoss
+from losses.composite_losses.list_loss import LossesList
 from losses.composite_losses.pyramid_loss import PyramidLoss
 from losses.experimental_patch_losses import MMD_PP
 from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.patch_loss import PatchRBFLoss
+from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 
 sys.path.append(os.path.realpath("../.."))
-from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations
+from GenerativeModels.GLO.utils import NormalSampler, MappingSampler, plot_interpolations, find_nearest_neighbor, \
+    find_nearest_neighbor_memory_efficient
 from GenerativeModels.utils.data_utils import get_dataset
 from GLO import GLOTrainer
 from GenerativeModels import models
@@ -30,19 +38,27 @@ def train_GLO(dataset_name, train_name, tag):
 
     # define the generator
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
+    generator.apply(weights_init)
 
     # Define the loss criterion
-    # criterion = L1()
+    # criterion = L2()
     # criterion = LapLoss(max_levels=3, no_last_layer=True)
     # criterion = VGGPerceptualLoss(pretrained=True, features_metric_name='l1+gram')
 
-    # criterion = SWD_PPP()
+    # criterion = PatchRBFLoss(patch_size=11, strides=2, sigma=0.015, pad_image=True)
+    # criterion = LapLoss()
     # criterion = PatchRBFLoss(patch_size=19, sigma=0.01, pad_image=True)
     # criterion = LaplacyanLoss(PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True), weightening_mode=3, max_levels=2)
-    criterion = PyramidLoss(MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean'), max_levels=3, weightening_mode=1)
+    # criterion = LossesList([
+    #     L2(),
+    #     PyramidLoss(MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean'), max_levels=3,
+    #                 weightening_mode=1)
+    # ], weights=[0.01, 1])
 
-    # criterion = VGGPerceptualLoss(pretrained=False, norm_first_conv=True, reinit=True,
-    #             layers_and_weights=[('conv1_2', 0.1), ('conv2_2', 4.0), ('conv3_3', 8.0), ('conv4_3', 8.0),('conv5_3', 3.0)])
+    # criterion = MMD_PP(r=64, patch_size=7, local_patch_size=7, local_sigma=0.02)
+    # criterion.name = "MMD++(p=7)"
+    criterion = VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)])
+    criterion.name = "VGG-PT-conv2_2"
 
     # criterion = MMDApproximate(r=1024, pool_size=32, pool_strides=16, normalize_patch='channel_mean')
     # criterion = MMD_PP(device, patch_size=5, pool_size=32, pool_strides=16, r=256, normalize_patch='channel_mean', weights=[0.001, 0.05, 1.0])
@@ -56,7 +72,7 @@ def train_GLO(dataset_name, train_name, tag):
 def train_latent_samplers(train_dir):
     latent_codes = torch.load(os.path.join(train_dir, 'latent_codes.pth'), map_location=device)['emb.weight']
     n, z_dim = latent_codes.shape
-    e_dim = z_dim
+    e_dim = default_config.e_dim
 
     mapping = models.LatentMapper(e_dim, z_dim).train()
     #
@@ -70,6 +86,8 @@ def train_latent_samplers(train_dir):
 
 
 def test_models(train_dir):
+    os.makedirs(f"{train_dir}/test_imgs", exist_ok=True)
+
     glo_params = default_config
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim).to(device)
     imle_mapping = models.LatentMapper(glo_params.e_dim, glo_params.z_dim).to(device)
@@ -84,28 +102,31 @@ def test_models(train_dir):
     # imle_mapping.eval()
     # gmmn_mapping.eval()
 
-    # plot reconstructions
+    # plot train reconstructions
     latent_codes = data_embeddings[torch.arange(64)]
-    vutils.save_image(generator(latent_codes).cpu(), f"{train_dir}/Reconstructions.png", normalize=True)
+    vutils.save_image(generator(latent_codes).cpu(), f"{train_dir}/test_imgs/train_econstructions.png", normalize=True)
 
     samplers = [NormalSampler(data_embeddings, device),
                 MappingSampler(imle_mapping, "IMLE", "normal", device),
                 # MappingSampler(gmmn_mapping, "GMMN", "uniform", device)
                 ]
 
-    # train_dataset = get_dataset('ffhq', split='train')
-    # test_dataset = get_dataset('ffhq', split='test', resize=glo_params.img_dim)
+    train_dataset = get_dataset('ffhq', split='train', resize=glo_params.img_dim)
 
     for sampler in samplers:
-        vutils.save_image(generator(sampler.sample(64)), f"{train_dir}/{sampler.name}_generated_images.png",
+        vutils.save_image(generator(sampler.sample(64)), f"{train_dir}/test_imgs/{sampler.name}_generated_images.png",
                           normalize=True)
-        # find_nearest_neighbor(generator, sampler, train_dataset, train_dir)
+        find_nearest_neighbor_memory_efficient(generator, sampler, train_dataset, train_dir)
 
+    train_dataset = get_dataset('ffhq', split='train', resize=glo_params.img_dim, memory_dataset=False)
+    test_dataset = get_dataset('ffhq', split='test', resize=glo_params.img_dim, memory_dataset=False)
+
+    print('as')
     for sampler in samplers[1:]:
         plot_interpolations(generator, sampler, data_embeddings, train_dir, z_interpolation=False)
         plot_interpolations(generator, sampler, data_embeddings, train_dir, z_interpolation=True)
 
-    # run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device)
+    run_FID_tests(train_dir, generator, data_embeddings, train_dataset, test_dataset, samplers, device)
 
 
 def plot_GLO_variance():
@@ -130,7 +151,7 @@ def plot_GLO_variance():
 
 if __name__ == '__main__':
     # plot_GLO_variance()
-    train_GLO('ffhq', "ffhq_128", '')
-    # train_dir = os.path.join('outputs', "ffhq_128", 'VGG-None_PT')
+    train_GLO('ffhq', "ffhq_128_512-z", '')
+    # train_dir = os.path.join('outputs', 'ffhq_128_512-z', 'MMD++')
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

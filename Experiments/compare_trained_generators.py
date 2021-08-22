@@ -15,7 +15,7 @@ from losses.classic_losses.lap1_loss import LapLoss
 from losses.swd.swd import LapSWDLoss_new
 from losses.swd.swd import PatchSWDLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
-from perceptual_mean_optimization.main import pt2cv
+from perceptual_mean_optimization.utils import pt2cv
 
 from GenerativeModels.config import default_config as params
 

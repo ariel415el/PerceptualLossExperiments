@@ -6,7 +6,7 @@ import torch
 from matplotlib import pyplot as plt
 import torch.nn.functional as F
 from Experiments.all import load_models
-from perceptual_mean_optimization.main import cv2pt, pt2cv
+from perceptual_mean_optimization.utils import pt2cv, cv2pt
 
 device = torch.device("cpu")
 

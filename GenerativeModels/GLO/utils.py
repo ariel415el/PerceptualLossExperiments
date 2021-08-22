@@ -1,7 +1,10 @@
+import os
+
 import numpy as np
 import torch
 
 import torchvision.utils as vutils
+from tqdm import tqdm
 
 
 def find_nearest_neighbor(generator, sampler, dataset, train_dir):
@@ -11,7 +14,20 @@ def find_nearest_neighbor(generator, sampler, dataset, train_dir):
     dists = torch.sum((generated_imgs.unsqueeze(1) - dataset_images)**2, dim=[2, 3, 4]) # n x len(dataset) matrix of dist images
     nearest_neighbor_idxs = torch.argmin(dists, dim=1)
     nearest_neighbors = dataset_images[nearest_neighbor_idxs]
-    vutils.save_image(torch.cat([generated_imgs, nearest_neighbors]), f"{train_dir}/imgs/{sampler.name}_Nearest_neighbors.png", normalize=True, nrow=n)
+    vutils.save_image(torch.cat([generated_imgs, nearest_neighbors]), f"{train_dir}/test_imgs/{sampler.name}_Nearest_neighbors.png", normalize=True, nrow=n)
+
+def find_nearest_neighbor_memory_efficient(generator, sampler, dataset, train_dir):
+    n = 8
+    generated_imgs = generator(sampler.sample(n)).cpu()
+    dists = np.zeros((n, dataset.images.shape[0]))
+    pbar = tqdm(total=n*dataset.images.shape[0])
+    for i in range(n):
+        for j in range(dataset.images.shape[0]):
+            pbar.set_description(f"Calculating dists: {i},{j}")
+            dists[i,j] = np.mean((generated_imgs[i].detach().numpy() - dataset.images[j])**2)
+    nearest_neighbor_idxs = np.argmin(dists, axis=1)
+    nearest_neighbors = torch.from_numpy(dataset.images[nearest_neighbor_idxs])
+    vutils.save_image(torch.cat([generated_imgs, nearest_neighbors]), f"{train_dir}/test_imgs/{sampler.name}_Nearest_neighbors.png", normalize=True, nrow=n)
 
 
 def plot_interpolations(generator, latent_sampler, data_embeddings, train_dir, z_interpolation=False):
@@ -41,8 +57,8 @@ def plot_interpolations(generator, latent_sampler, data_embeddings, train_dir, z
         for i in range(num_steps):
             rearanged_images.append(imgs[i*num_sets + j])
     imgs = torch.stack(rearanged_images)
-
-    vutils.save_image(imgs, f"{train_dir}/imgs/{latent_sampler.name}_{'z' if z_interpolation else 'e'}-Interpolations.png", normalize=True, nrow=num_steps)
+    os.makedirs(f"{train_dir}/imgs", exist_ok=True)
+    vutils.save_image(imgs, f"{train_dir}/test_imgs/{latent_sampler.name}_{'z' if z_interpolation else 'e'}-Interpolations.png", normalize=True, nrow=num_steps)
 
 
 class NormalSampler:

@@ -9,7 +9,7 @@ import torch
 from image_retargeting.utils import aspect_ratio_resize, get_pyramid, quantize_image
 from losses.mmd.patch_mmd import PatchMMDLoss
 from losses.swd.patch_swd import PatchSWDLoss
-from perceptual_mean_optimization.main import cv2pt
+from perceptual_mean_optimization.utils import cv2pt
 import torchvision.utils as vutils
 from torchvision import transforms
 
@@ -77,10 +77,6 @@ def retarget_image(img_path, criterias, output_dir):
 
     pyramid = get_pyramid(img, n_scales, perc)
 
-    # starting_img = cv2pt(cv2.imread('/home/ariel/university/repos/SinGAN/Input/Paint/cows.png'))
-    # synthesis = transforms.Resize(pyramid[0].shape[1:], antialias=True)(starting_img)
-
-    # synthesis = torch.randn((3, int(pyramid[0].shape[1] * 1), int(pyramid[0].shape[2] * 0.6))) * 0.1
     synthesis = torch.randn(pyramid[0].shape) * 0.1
 
     for lvl, lvl_img in enumerate(pyramid):
@@ -104,13 +100,13 @@ def retarget_image(img_path, criterias, output_dir):
 if __name__ == '__main__':
     # img_path = 'images/balloons.png'
     # img_path = 'images/birds.png'
-    img_path = 'images/girafs.png'
-    # img_path = 'images/cows.png'
+    # img_path = 'images/girafs.png'
+    img_path = 'images/cows.png'
     # img_path = 'images/trees3.jpg'
     # img_path = 'images/fruit.png'
     criterias = [
-        # (PatchMMDLoss(patch_size=11, stride=3), 1, ),
-        (PatchSWDLoss(patch_size=11, stride=3, num_proj=1024), 1, ),
+        (PatchMMDLoss(patch_size=11, stride=3), 1, ),
+        # (PatchSWDLoss(patch_size=11, stride=3, num_proj=1024), 1, ),
     ]
 
     # target = cv2pt(cv2.imread('images/balloons.png'))

@@ -8,6 +8,7 @@
 
 /GenerativeModels/GLO/outputs
 /GenerativeModels/GMMN/outputs
+/GenerativeModels/VAE/outputs
 /GenerativeModels/AutoEncoders/outputs
 /GenerativeModels/Experiments_outputs
 /style_transfer/outputs
@@ -15,6 +16,7 @@
 /perceptual_mean_optimization/clusters
 /perceptual_mean_optimization/single_outputs
 /perceptual_mean_optimization/outputs
+/perceptual_mean_optimization/2_images_outputs
 /Experiments/compare_trained_generators_losses_outputs
 /Experiments/trained_models
 /Experiments/test_swd

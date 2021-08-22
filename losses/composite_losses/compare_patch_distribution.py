@@ -10,7 +10,8 @@ def extract_patches(x, patch_size, stride, normalize_patch):
         dims = (0, 1, 2, 3, 4) if normalize_patch == 'mean' else (0, 1, 3, 4)
         x_std, x_mean = torch.std_mean(x_patches, dim=dims, keepdim=True)
         x_patches = (x_patches - x_mean)
-        # x_patches /= (x_std + 1e-8)
+        if normalize_patch == 'normalize':
+            x_patches /= (x_std + 1e-8)
     return x_patches.view(b, -1, 3 * patch_size ** 2)
 
 

@@ -76,7 +76,7 @@ def download_ffhq_thumbnails(data_dir):
     print("Done.")
 
 
-def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ariel/university/data', val_percent=0.15):
+def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ariel/university/data', val_percent=0.15, memory_dataset=True):
     kwargs = dict()
 
     if dataset_name == 'celeba':
@@ -87,8 +87,10 @@ def get_dataset(dataset_name, resize, split='train', default_data_root='/home/ar
         if not os.path.exists(train_samples_path):
             download_ffhq_thumbnails(os.path.dirname(train_samples_path))
         kwargs['resize'] = resize
-        # dataset_type = DiskDataset
-        dataset_type = MemoryDataset
+        if memory_dataset:
+            dataset_type = MemoryDataset
+        else:
+            dataset_type = DiskDataset
     else:
         raise ValueError("Dataset not supported")
 
