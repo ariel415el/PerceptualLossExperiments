@@ -26,7 +26,7 @@ default_config.batch_size = 64
 default_config.num_epochs = 200
 
 # GLO parameters
-default_config.e_dim = 512
+default_config.e_dim = 64
 default_config.generator_lr_factor = 0.1
 default_config.num_z_steps = 1
 default_config.force_norm = True

@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -9,14 +8,8 @@ import torch
 import torchvision.utils as vutils
 from torchvision import transforms
 
-from losses.classic_losses.grad_loss import GradLoss, GradLoss3Channels
-from losses.classic_losses.l2 import L2
-from losses.composite_losses.list_loss import LossesList
-from losses.experimental_patch_losses import MMD_PP
-from losses.mmd.patch_mmd import PatchMMDLoss
-from losses.patch_loss import PatchRBFLoss
-from losses.swd.patch_swd import PatchSWDLoss
-from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
+import losses
+
 from perceptual_mean_optimization.utils import pt2cv, load_images, Plotter, get_pyramid
 
 sys.path.append(os.path.realpath(".."))
@@ -174,9 +167,9 @@ if __name__ == '__main__':
         # 'clusters/z_samples_new/4/data_neighbors4',
         'clusters/z_samples_new/6/data_neighbors6',
         # 'clusters/z_samples_new/10/data_neighbors10',
-        # 'clusters/z_samples_new/16/data_neighbors16',
+        'clusters/z_samples_new/16/data_neighbors16',
         # 'clusters/z_samples_new/51/data_neighbors51',
-        'clusters/z_samples_new/55/data_neighbors55',
+        # 'clusters/z_samples_new/55/data_neighbors55',
         # 'clusters/z_samples_new/all',
         # 'clusters/stylegan/stylegan_128/images',
 
@@ -203,29 +196,34 @@ if __name__ == '__main__':
         # 'clusters/textures/mixed/wood_mix',
 
     ]
-
     losses = [
-        # GradLoss(),
-        # L2(),
-        # PatchRBFLoss(patch_size=11, strides=1, sigma=0.01, pad_image=True),
 
-        # VGGPerceptualLoss(pretrained=True, layers_and_weights=[('relu1_2', 1.0), ('relu2_2', 1.0), ('relu3_3', 1.0)]),
-        # PatchMMDLoss(patch_size=11, stride=3, normalize_patch='channel_mean'),
-        # PatchRBFLoss(patch_size=11, strides=1, sigma=0.02, pad_image=True),
-        # PatchMMDLoss(patch_size=11, stride=3),
-        PatchSWDLoss(patch_size=11, stride=3, num_proj=1024, normalize_patch='channel_mean'),
-        # MMD_PP(pool_size=32, pool_strides=16, r=256),
-        # MMD_PP(pool_size=16, pool_strides=4, r=256),
-        # LossesList([
-        #     PatchRBFLoss(patch_size=11, strides=1, sigma=0.02, pad_image=True),
-        #     PatchSWDLoss(patch_size=11, stride=5),
-        # ], weights=[1,0.1])
-        # PatchSWDLoss(patch_size=11, stride=5, num_proj=1024),
-        # MMDApproximate(r=128, pool_size=32, pool_strides=16, normalize_patch='none'),
-        # PyramidLoss(MMDApproximate(r=128, pool_size=32, pool_strides=16, normalize_patch='none'), max_levels=3, weightening_mode=3)
+        # losses.PatchRBFLoss(patch_size=11, strides=5, sigma=0.01, pad_image=True),
+        # losses.MMDApproximate(patch_size=11, strides=5, sigma=0.01, r=1024, pool_size=16, pool_strides=8,normalize_patch='channel_mean'),
+        # losses.MMDApproximate(pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean'),
+        # losses.MMDApproximate(pool_size=64, pool_strides=32, r=128, normalize_patch='channel_mean'),
+        losses.MMDApproximate(patch_size=11, strides=5, pool_size=128, pool_strides=1, r=128, normalize_patch='channel_mean'),
+        losses.PatchSWDLoss(patch_size=11, stride=5, normalize_patch='channel_mean'),
+        losses.PatchMMDLoss(patch_size=11, stride=5, normalize_patch='channel_mean')
+        # losses.WindowLoss(losses.PatchSWDLoss(patch_size=3, stride=1, normalize_patch='channel_mean'), window_size=64, stride=32),
+        # losses.WindowLoss(losses.PatchSWDLoss(patch_size=3, stride=1, normalize_patch='channel_mean'), window_size=32, stride=16),
+        # losses.WindowLoss(losses.PatchSWDLoss(patch_size=3, stride=1, normalize_patch='channel_mean'), window_size=16, stride=8),
+        #
+        # losses.WindowLoss(losses.PatchMMDLoss(patch_size=3, stride=1, sigmas=[0.06], normalize_patch='channel_mean'), window_size=64, stride=32),
+        # losses.WindowLoss(losses.PatchMMDLoss(patch_size=3, stride=1, sigmas=[0.06], normalize_patch='channel_mean'), window_size=32, stride=16),
+        # losses.WindowLoss(losses.PatchMMDLoss(patch_size=3, stride=1, sigmas=[0.06], normalize_patch='channel_mean'), window_size=16, stride=8),
+
+        # losses.LossesList([
+        #     losses.PatchRBFLoss(patch_size=3, strides=1, sigma=0.06, pad_image=True),
+        #     losses.MMDApproximate(patch_size=3, strides=1, sigma=0.06, r=256, pool_size=128, pool_strides=1, normalize_patch='channel_mean'),
+        # ], weights=[0.05, 1.0]),
+
+        # losses.MMD_PP(r=128),
+        # losses.SWD_PP(num_proj=128),
     ]
 
-    n_images = 4
+
+    n_images = 2
     start_mode = 'mean+blur'
     # start_mode = 'mean'
     multi_scale = False

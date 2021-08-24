@@ -30,6 +30,27 @@ class PatchSWDLoss(torch.nn.Module):
     def forward(self, x, y):
         return self.loss(x, y)
 
+class FastPatchSWDLoss(torch.nn.Module):
+    def _get_w_b(self, n_channels):
+        self.w = torch.randn(self.r, n_channels, self.ksize, self.ksize) / self.sigma
+        if self.normalize_patch == 'channel_mean':
+            self.w -= self.w.mean(dim=(2, 3), keepdim=True)
+        elif self.normalize_patch == 'mean':
+            self.w -= self.w.mean(dim=(1, 2, 3), keepdim=True)
+        self.b = torch.rand(self.r) * (2 * np.pi)
+        return self.w, self.b
+
+    def __init__(self, patch_size=7, stride=1, n_samples=None, num_proj=256, sample_same_locations=True,
+                 batch_reduction='mean', normalize_patch='none'):
+        super(FastPatchSWDLoss, self).__init__()
+        self.kernel = torch.randn(self.r, n_channels, self.ksize, self.ksize) / self.sigma
+
+        self.name = f"PatchSWD(p-{patch_size}:{stride})"
+
+    def forward(self, x, y):
+        return self.loss(x, y)
+
+
 
 if __name__ == '__main__':
     x = torch.ones((5, 3, 64, 64))

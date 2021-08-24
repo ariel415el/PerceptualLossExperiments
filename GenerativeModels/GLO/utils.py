@@ -16,6 +16,7 @@ def find_nearest_neighbor(generator, sampler, dataset, train_dir):
     nearest_neighbors = dataset_images[nearest_neighbor_idxs]
     vutils.save_image(torch.cat([generated_imgs, nearest_neighbors]), f"{train_dir}/test_imgs/{sampler.name}_Nearest_neighbors.png", normalize=True, nrow=n)
 
+
 def find_nearest_neighbor_memory_efficient(generator, sampler, dataset, train_dir):
     n = 8
     generated_imgs = generator(sampler.sample(n)).cpu()
@@ -57,9 +58,26 @@ def plot_interpolations(generator, latent_sampler, data_embeddings, train_dir, z
         for i in range(num_steps):
             rearanged_images.append(imgs[i*num_sets + j])
     imgs = torch.stack(rearanged_images)
-    os.makedirs(f"{train_dir}/imgs", exist_ok=True)
     vutils.save_image(imgs, f"{train_dir}/test_imgs/{latent_sampler.name}_{'z' if z_interpolation else 'e'}-Interpolations.png", normalize=True, nrow=num_steps)
 
+
+def plot_GLO_variance(glo_params, generator, device):
+    os.makedirs('tmps', exist_ok=True)
+    import numpy as np
+    full_data = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/april_25/dummy'
+    partial_data = '/home/ariel/universirty/PerceptualLoss/PerceptualLossExperiments/GLO/outputs/april_25/pretrained-1000_examples_random_unit_normed'
+    # generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim).to(device)
+    for dir_name, name in [(full_data, "full"), (partial_data, "partial")]:
+        generator.load_state_dict(torch.load(os.path.join(dir_name, 'generator.pth'), map_location=device))
+        data_embeddings = torch.load(os.path.join(dir_name, 'latent_codes.pth'), map_location=device)['emb.weight']
+        vutils.save_image(generator(data_embeddings[:64]), f"tmps/{name}_recs.png", normalize=True)
+        for sigma in [0.00001, 0.001, 0.01, 0.1]:
+            noise = torch.from_numpy(np.random.multivariate_normal(data_embeddings[6].cpu().numpy(),
+                                                                    torch.eye(glo_params.z_dim) * sigma,
+                                                                    size=64)).to(device).float()
+            imgs = generator(noise)
+            vutils.save_image((imgs + 1) / 2, f"tmps/{name}_{sigma}-{imgs.min():.3f}_{imgs.max():.3f}.png",
+                              normalize=False)
 
 class NormalSampler:
     def __init__(self, data_embeddings, device):

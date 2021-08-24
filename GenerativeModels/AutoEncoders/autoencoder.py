@@ -4,7 +4,6 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torchvision.utils as vutils
-from torch import nn as nn
 from tqdm import tqdm
 from time import time
 
@@ -12,7 +11,6 @@ import GenerativeModels.GLO.utils
 import GenerativeModels.utils.data_utils
 import os
 import matplotlib.pyplot as plt
-from GenerativeModels.models import weights_init
 
 
 class AutoEncoderTraniner:

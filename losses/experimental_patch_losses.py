@@ -73,9 +73,9 @@ class MMD_PPP(torch.nn.Module):
         return sum([self.losses[i](x, y) * self.weights[i] for i in range(len(self.losses))])
 
 
-class SWD_PPP(torch.nn.Module):
-    def __init__(self, r=512, normalize_patch='channel_mean', weights=None, batch_reduction='mean'):
-        super(SWD_PPP, self).__init__()
+class SWD_PP(torch.nn.Module):
+    def __init__(self, num_proj=128, normalize_patch='channel_mean', weights=None, batch_reduction='mean'):
+        super(SWD_PP, self).__init__()
         if weights is None:
             self.weights = [0.01, 0.2, 1, 0.5]
         else:
@@ -83,15 +83,12 @@ class SWD_PPP(torch.nn.Module):
 
         self.losses = torch.nn.ModuleList([
             L2(batch_reduction=batch_reduction),
-            # PatchRBFLoss(patch_size=3, sigma=0.06, pad_image=True, batch_reduction=batch_reduction),
-            PatchRBFLoss(patch_size=11, sigma=0.02, pad_image=True, batch_reduction=batch_reduction),
-            WindowLoss(PatchSWDLoss(patch_size=3, num_proj=128, n_samples=128), batch_reduction=batch_reduction,
-                       stride=16)
+            PatchRBFLoss(patch_size=11, sigma=0.015, pad_image=True, batch_reduction=batch_reduction),
+            # WindowLoss(PatchSWDLoss(patch_size=11, stride=5, num_proj=num_proj, normalize_patch=normalize_patch), batch_reduction=batch_reduction, window_size=32, stride=16)
+            PatchSWDLoss(patch_size=11, stride=5, num_proj=num_proj, normalize_patch=normalize_patch)
         ])
 
-        # self.name = f"MMD+++(rf={r},w={self.weights})"
-        self.name = f"SWD+++(w={self.weights})"
-        # self.name = f"SWD+++"
+        self.name = f"SWD++(num_proj={num_proj})"
 
     def forward(self, x, y):
         return sum([self.losses[i](x, y) * self.weights[i] for i in range(len(self.losses))])

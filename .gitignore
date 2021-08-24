@@ -26,7 +26,7 @@
 /Experiments/optimize_model
 /Experiments/box_dataset
 /image_retargeting/images
-image_retargeting/optimized_images_outputs
-
+/image_retargeting/optimized_images_outputs
+/cnn_visuzlization/Outputs
 /losses/gabor_loss/*.pth
 /losses/gabor_loss/*.png

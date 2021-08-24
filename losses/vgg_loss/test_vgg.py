@@ -1,3 +1,6 @@
+import os
+
+from torch import nn
 from torchvision import models
 import torch
 from PIL import Image
