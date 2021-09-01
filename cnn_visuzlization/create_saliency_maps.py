@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from torch.autograd import Variable
 from cnn_visuzlization.common import save_scaled_images
 
 
@@ -11,50 +11,95 @@ class VanillaBackprop:
     """
         Produces gradients generated with vanilla back propagation from the image
     """
-    def __init__(self, model):
+    def __init__(self, model, guided=False):
         self.model = model
         self.gradients = None
         # Put model in evaluation mode
         self.model.eval()
         # Hook the first layer to get the gradient
+        if guided:
+            self.forward_relu_outputs = []
+            self.update_relus()
         self.hook_layers()
 
     def hook_layers(self):
         def hook_function(module, grad_in, grad_out):
+            # import pydevd
+            # pydevd.settrace(suspend=False, trace_only_current_thread=True)
             self.gradients = grad_in[0]
 
         # Register hook to the first layer
-        first_layer = list(self.model.features._modules.items())[0][1]
-        first_layer.register_backward_hook(hook_function)
+        first_layer = list(self.model._modules.items())[0][1]
+        first_layer.register_full_backward_hook(hook_function)
 
-    def generate_gradients(self, input_image, target_class):
-        # Forward
+    def update_relus(self):
+        """
+            Updates relu activation functions so that
+                1- stores output in forward pass
+                2- imputes zero for gradient values that are less than zero
+        """
+        def relu_backward_hook_function(module, grad_in, grad_out):
+            """
+            If there is a negative gradient, change it to zero
+            """
+            # Get last forward output
+            corresponding_forward_output = self.forward_relu_outputs[-1]
+            corresponding_forward_output[corresponding_forward_output > 0] = 1
+            modified_grad_out = corresponding_forward_output * torch.clamp(grad_in[0], min=0.0)
+            del self.forward_relu_outputs[-1]  # Remove last forward output
+            return (modified_grad_out,)
+
+        def relu_forward_hook_function(module, ten_in, ten_out):
+            """
+            Store results of forward pass
+            """
+            self.forward_relu_outputs.append(ten_out)
+
+        # Loop through layers, hook up ReLUs
+        for pos, module in self.model._modules.items():
+            if isinstance(module, torch.nn.ReLU):
+                module.register_backward_hook(relu_backward_hook_function)
+                module.register_forward_hook(relu_forward_hook_function)
+
+    def generate_gradients(self, input_image, c):
+        # Inputs need to be the variable w.r.t which we compute gradients
+        input_image = Variable(input_image, requires_grad=True)
+
         model_output = self.model(input_image)
-        # Zero grads
+
         self.model.zero_grad()
-        # Target for backprop
-        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
-        one_hot_output[0][target_class] = 1
-        # Backward pass
+
+        # Gradients are zeroed in all channels but the desired one
+        one_hot_output = torch.FloatTensor(model_output.shape).zero_().to(input_image.device)
+        one_hot_output[:,c] = 1
         model_output.backward(gradient=one_hot_output)
-        # Convert Pytorch variable to numpy array
-        # [0] to get rid of the first channel (1,3,224,224)
-        gradients_as_arr = self.gradients.data.numpy()[0]
-        return gradients_as_arr
+
+        # Return the gradietns saved by the backward hook function
+        return self.gradients.data
 
 
-def show_saliency_maps(net, dataloader, resize_patch, output_dir, device):
-    os.makedirs(output_dir, exist_ok=True)
-    for c_idx in range(0, net.m_n_maps, 10):
-        image = torch.from_numpy(dataloader.dataset[np.random.randint(0, len(dataloader.dataset))][1]).to(device).float().unsqueeze(0)
-
+def show_saliency_maps(net, dataloader, resize_patch, output_dir, device, n_images=10, n_channels=10):
+    VBP = VanillaBackprop(net, guided=True)
+    image_indices = np.random.choice(range(len(dataloader.dataset)), n_images, replace=False)
+    c_indices =  np.random.choice(range(net.m_n_maps), n_channels, replace=False)
+    # n_patches = 32
+    for img_idx in image_indices:
+        img_dir = f"{output_dir}/{img_idx}"
+        image = torch.from_numpy(dataloader.dataset[img_idx][1]).to(device).float().unsqueeze(0)
         all_patches = F.unfold(image, kernel_size=net.m_receptive_field, padding=0, stride=net.m_stride)
-        patch_idx = np.random.choice(all_patches.shape[-1])
-        patch = all_patches[0, :, patch_idx].reshape(3, net.m_receptive_field, net.m_receptive_field)
+        all_patches = all_patches[0].transpose(1, 0).reshape(-1, 3, net.m_receptive_field, net.m_receptive_field)
 
-        VBP = VanillaBackprop(net)
-        vanilla_grads = VBP.generate_gradients(patch, c_idx)
+        activations = net(image).detach().transpose(1, 0).repeat(1, 3, 1, 1)
 
-        save_scaled_images(vanilla_grads, resize_patch, f"{output_dir}/c-{c_idx}_grads.png")
-        save_scaled_images(image, 1, f"{output_dir}/c-{c_idx}_img.png")
-        save_scaled_images(patch, resize_patch, f"{output_dir}/c-{c_idx}_patch.png")
+        save_scaled_images(activations, resize_patch, f"{img_dir}/all_activations.png")
+        save_scaled_images(image, resize_patch, f"{img_dir}/image.png")
+        save_scaled_images(all_patches.clone(), resize_patch, f"{img_dir}/all_patches.png")
+
+        for c_idx in c_indices:
+            image_grads = VBP.generate_gradients(image, c_idx)
+            patch_grads = VBP.generate_gradients(all_patches, c_idx)
+
+            save_scaled_images(image_grads, resize_patch, f"{img_dir}/channels/c-{c_idx}_image_grads.png")
+            save_scaled_images(patch_grads, resize_patch, f"{img_dir}/channels/c-{c_idx}_patch_grads.png")
+            save_scaled_images(activations[c_idx], resize_patch, f"{img_dir}/channels/c-{c_idx}_activations.png")
+

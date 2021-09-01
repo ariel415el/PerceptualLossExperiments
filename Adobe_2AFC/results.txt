@@ -21,3 +21,18 @@ VGG(PT_M-cx):                                0.80/0.00
 VGG(PT_M-swd):                               0.77/0.00
 Windowed(w-32-8)-PatchSWD(p-3-1):            0.72/0.00
 
+criterion: mean/std
+vgg-rand_conv1_2:                            0.691/0.00
+vgg-rand_conv2_2:                            0.712/0.00
+vgg-rand_conv3_3:                            0.728/0.00
+vgg-rand_conv4_3:                            0.731/0.00
+vgg-rand_conv5_3:                            0.731/0.00
+vgg-conv1_2:                                 0.696/0.00
+vgg-conv2_2:                                 0.697/0.00
+vgg-conv3_3:                                 0.729/0.00
+vgg-conv4_3:                                 0.768/0.00
+vgg-onv5_3:                                  0.769/0.00
+AlexNet_1_pt:                                0.688/0.00
+AlexNet_1_rand:                              0.676/0.00
+AlexNet_4_pt:                                0.747/0.00
+AlexNet_4_rand:                              0.679/0.00

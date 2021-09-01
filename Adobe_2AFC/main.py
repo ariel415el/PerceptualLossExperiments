@@ -4,9 +4,7 @@ import torch
 
 from dataset import get_dataloader
 
-# from losses.mmd_exact_loss import MMDExact
-from losses.mmd.windowed_patch_mmd import MMDApproximate
-from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
+import losses
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -55,14 +53,21 @@ def score_2afc_dataset(data_loader, func, name=''):
 
 def main():
     criterions = [
-        # MMD_PP(batch_reduction='none'),
-        # VGGPerceptualLoss(pretrained=False, batch_reduction='none'),
-        # VGGPerceptualLoss(pretrained=False, reinit=True, batch_reduction='none'),
-        VGGPerceptualLoss(pretrained=False, reinit=False, norm_first_conv=True, batch_reduction='none')
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=3, sigma=0.1, pool_size=32, pool_strides=16, r=64, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=16, pool_strides=8, r=64, batch_reduction='none', normalize_patch='channel_mean'),
-        # MMDApproximate(patch_size=3, sigma=0.06, pool_size=8, pool_strides=4, r=64, batch_reduction='none', normalize_patch='channel_mean'),
+        # losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv1_2', 1)], batch_reduction='none', name='vgg-rand_conv1_2'),
+        # losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv2_2', 1)], batch_reduction='none', name='vgg-rand_conv2_2'),
+        # losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv3_3', 1)], batch_reduction='none', name='vgg-rand_conv3_3'),
+        # losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv4_3', 1)], batch_reduction='none', name='vgg-rand_conv4_3'),
+        # losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv5_3', 1)], batch_reduction='none', name='vgg-rand_conv5_3'),
+        #
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1)], batch_reduction='none', name='vgg-conv1_2'),
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)], batch_reduction='none', name='vgg-conv2_2'),
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv3_3', 1)], batch_reduction='none', name='vgg-conv3_3'),
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv4_3', 1)], batch_reduction='none', name='vgg-conv4_3'),
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv5_3', 1)], batch_reduction='none', name='vgg-onv5_3'),
+        losses.AlexNetLoss(pretrained=True, n_maxpools=1, batch_reduction='none'),
+        losses.AlexNetLoss(pretrained=False, n_maxpools=1, batch_reduction='none'),
+        losses.AlexNetLoss(pretrained=True, n_maxpools=4, batch_reduction='none'),
+        losses.AlexNetLoss(pretrained=False, n_maxpools=4, batch_reduction='none')
     ]
 
     dataloader = get_dataloader([
@@ -70,7 +75,7 @@ def main():
                                  "../../../data/Perceptual2AFC/2afc/val/traditional"
                                 ],
                                 batch_size=8,
-                                num_workers=4)
+                                num_workers=0)
 
     f = open("results.txt", 'a')
     f.write(f"criterion: mean/std\n")

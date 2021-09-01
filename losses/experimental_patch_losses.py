@@ -146,6 +146,31 @@ class SimplePatchLoss(torch.nn.Module):
         else:
             return loss.view(x.shape[0], -1).mean(1)
 
+
+class PerPatchLoss(torch.nn.Module):
+    """
+    Minimize gaussian distance over spatially matching patches of two images.
+    RBf forces the patches to be exactly like the optimized image. As sigma gets closer, any deviation leads immediatly
+        to a higher loss. In other words, averaging is not the way to go here
+    """
+    def __init__(self, receptive_field, stride):
+        super(PerPatchLoss, self).__init__()
+        self.name = f'PerPatchLoss'
+        self.receptive_field = receptive_field
+        self.stride = stride
+        from classic_losses.grad_loss import GradLoss3Channels
+        self.loss = GradLoss3Channels()
+
+    def forward(self, x, y):
+        x_patches = torch.nn.functional.unfold(x, kernel_size=self.receptive_field, padding=0, stride=self.stride)
+        y_patches = torch.nn.functional.unfold(y, kernel_size=self.receptive_field, padding=0, stride=self.stride)
+        dists = 0.05 * ((x_patches - y_patches)**2).mean()
+        d = int(np.sqrt(x_patches.shape[1] / 3))
+        x_patches = x_patches.transpose(2, 1).reshape(-1, 3, d, d)
+        y_patches = y_patches.transpose(2, 1).reshape(-1, 3, d, d)
+        dists += self.loss(x_patches, y_patches)
+        return dists
+
 if __name__ == '__main__':
 
     loss = SimplePatchLoss(11, sigma=0.02)

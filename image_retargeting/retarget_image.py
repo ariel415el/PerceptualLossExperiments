@@ -7,8 +7,7 @@ import cv2
 import torch
 
 from image_retargeting.utils import aspect_ratio_resize, get_pyramid, quantize_image
-from losses.mmd.patch_mmd import PatchMMDLoss
-from losses.swd.patch_swd import PatchSWDLoss
+import losses
 from perceptual_mean_optimization.utils import cv2pt
 import torchvision.utils as vutils
 from torchvision import transforms
@@ -72,7 +71,7 @@ def retarget_image(img_path, criterias, output_dir):
     num_steps = 5000
     lr = 0.005
     img = cv2.imread(img_path)
-    # img = aspect_ratio_resize(img, max_dim=256)
+    img = aspect_ratio_resize(img, max_dim=256)
     img = cv2pt(img)
 
     pyramid = get_pyramid(img, n_scales, perc)
@@ -99,16 +98,24 @@ def retarget_image(img_path, criterias, output_dir):
 
 if __name__ == '__main__':
     # img_path = 'images/balloons.png'
+    img_path = 'images/soccer1.png'
+    # img_path = 'images/soccer2.jpg'
+    # img_path = 'images/soccer3.jpg'
+    # img_path = 'images/jerusalem1.jpg'
+    img_path = 'images/jerusalem2.jpg'
     # img_path = 'images/birds.png'
     # img_path = 'images/girafs.png'
-    img_path = 'images/cows.png'
+    # img_path = 'images/cows.png'
     # img_path = 'images/trees3.jpg'
     # img_path = 'images/fruit.png'
     criterias = [
-        (PatchMMDLoss(patch_size=11, stride=3), 1, ),
+        (losses.PatchMMDLoss(patch_size=11, stride=3), 1, ),
+        # (losses.PatchMMDLoss(patch_size=5, stride=2), 1, ),
+        # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1), ('conv2_2', 1)], name='vgg-pt-conv1-2', features_metric_name='gram').to(device), 1),
+        # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)], name='vgg-pt-conv2_2', features_metric_name='gram').to(device), 1),
         # (PatchSWDLoss(patch_size=11, stride=3, num_proj=1024), 1, ),
     ]
-
+    criterias[0][0].name = 'MMD(11:3,dotprod)'
     # target = cv2pt(cv2.imread('images/balloons.png'))
     # starting = cv2pt(cv2.imread('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/optimized_images_outputs/balloons/PatchMMD(p-17:1)/final-5.png'))
     # synthesis = match_patch_distributions(starting, target, criterias, 10000, 0.01, "single_outputs")

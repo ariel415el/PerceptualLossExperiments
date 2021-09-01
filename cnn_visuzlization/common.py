@@ -39,7 +39,42 @@ def calculate_receptive_field(cfg):
     return receptive_field, stride
 
 
-def get_single_conv_vgg(cfg, drop_last_relu=False, load_weights=True):
+def get_single_conv_alexnet(cfg, load_weights=True, inplace_relus=False):
+    layers = [
+        nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=0),
+        nn.ReLU(inplace=inplace_relus),
+        nn.MaxPool2d(kernel_size=3, stride=2),
+        nn.Conv2d(64, 192, kernel_size=5, padding=0),
+        nn.ReLU(inplace=inplace_relus),
+    ]
+    stride = 8
+    receptive_field = 51
+    channels = 192
+    if cfg == 'conv1':
+        stride = 4
+        receptive_field = 11
+        channels = 64
+        layers = layers[:2]
+
+    net = nn.Sequential(*layers)
+
+    net.m_receptive_field = receptive_field
+    net.m_stride = stride
+    net.m_n_maps = channels
+
+    print(f"Receptive_field: {net.m_receptive_field}")
+    print(f"stride: {net.m_stride}")
+    print(f"n_maps: {net.m_n_maps}")
+
+    if load_weights:
+        state_dict = torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/losses/alexnet_loss/alexnet-owt-7be5be79.pth')
+        state_dict = {k.replace('features.', ''): v for k, v in state_dict.items() if k.replace('features.', '') in net.state_dict()}
+        net.load_state_dict(state_dict)
+
+    return net
+
+
+def get_single_conv_vgg(cfg, drop_last_relu=False, load_weights=True, inplace_relus=True):
     in_channels = 3
     features = []
     for v in cfg:
@@ -47,7 +82,7 @@ def get_single_conv_vgg(cfg, drop_last_relu=False, load_weights=True):
             features += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=(3, 3), padding=0)
-            features += [conv2d, nn.ReLU(inplace=True)]
+            features += [conv2d, nn.ReLU(inplace=inplace_relus)]
             in_channels = v
     if drop_last_relu:
         features = features[:-1]
@@ -55,7 +90,8 @@ def get_single_conv_vgg(cfg, drop_last_relu=False, load_weights=True):
     net = nn.Sequential(*features)
 
     if load_weights:
-        state_dict = torch.load('../losses/vgg_loss/vgg16_head.pth')
+        # state_dict = torch.load('../losses/vgg_loss/vgg16_head.pth')
+        state_dict = torch.load('../losses/vgg_loss/vgg16-VGGFace.pth')
         state_dict = {k.replace('features.', ''):v for k,v in state_dict.items() if k.replace('features.', '') in net.state_dict()}
         net.load_state_dict(state_dict)
 
@@ -90,6 +126,7 @@ def collect_feature_map_similarities(net, dataloader, feature_vec, device, mode=
     all_maps = []
     for (_, images) in dataloader:
         feature_map = net(images.to(device).float()).cpu().numpy()
+        torch.cuda.empty_cache()
         if mode == 'cosine':
             feature_map *= feature_vec.reshape(1, -1, 1, 1)
             feature_map = feature_map.sum(1)
@@ -105,11 +142,12 @@ def collect_feature_map_similarities(net, dataloader, feature_vec, device, mode=
 def find_most_activating_patches(net, dataloader, feature_vec, n_best, device, similarity_mode='l2'):
     imgs = []
     activated_patches = []
-    activations = []
 
     all_maps = collect_feature_map_similarities(net, dataloader, feature_vec, device, mode=similarity_mode)
 
     indices = np.array(np.unravel_index(np.argsort(all_maps, axis=None)[::-1][:n_best], all_maps.shape)).transpose()
+
+    patch_activations_heatmap = np.zeros((1, all_maps.shape[1], all_maps.shape[1]))
 
     for (im_idx, h_idx, w_idx) in indices:
         img = torch.from_numpy(dataloader.dataset[im_idx][1])
@@ -120,12 +158,14 @@ def find_most_activating_patches(net, dataloader, feature_vec, n_best, device, s
         patch = all_patches[h_idx * dim + w_idx]
         activated_patches.append(patch)
         imgs.append(img)
-        activations.append(all_maps[im_idx, h_idx, w_idx])
+        patch_activations_heatmap[0, h_idx, w_idx] = all_maps[im_idx, h_idx, w_idx]
 
-    print(activations)
-    return torch.stack(activated_patches), torch.stack(imgs)
+    # print(activations)
+    return torch.stack(activated_patches), torch.stack(imgs), patch_activations_heatmap
 
 
-def save_scaled_images(images, scale, path):
+def save_scaled_images(images, scale, path, normalize=True):
+    if os.path.dirname(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     images = transforms.Resize(images.shape[-1] * scale, interpolation=InterpolationMode.NEAREST)(images)
-    vutils.save_image(images, path, normalize=True)
+    vutils.save_image(images, path, normalize=True, nrow=int(np.sqrt(len(images))), pad_value=64)

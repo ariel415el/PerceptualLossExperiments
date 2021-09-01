@@ -28,6 +28,9 @@ class PyramidLoss(nn.Module):
             self.weight = lambda j: (2 ** (2 * (max_levels - j)))
         if weightening_mode == 3:
             self.weight = lambda j: 1
+        else:
+            assert len(weightening_mode) == max_levels + 1
+            self.weight = lambda j: weightening_mode[j]
 
     def forward(self, output, target):
         pyramid_output = get_gaussian_pyramid(output, self.max_levels)

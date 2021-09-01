@@ -33,25 +33,19 @@ def train_GLO(dataset_name, train_name, tag):
     # define the generator
     generator = models.DCGANGenerator(glo_params.z_dim, glo_params.channels, glo_params.img_dim)
     generator.apply(weights_init)
-
+    # generator.load_state_dict(torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/GLO/outputs/ffhq_128_512-z/L2/generator.pth'))
     # Define the loss criterion
 
-    # criterion = losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('pixels', 1), ('conv1_2', 1)])
-    # criterion.name = "VGG-PT-conv1_2+pix"
-    # criterion = losses.MMD_PP(r=128)
-    criterion = losses.LossesList([
-            losses.L2(),
-            # losses.PatchRBFLoss(patch_size=5, strides=1, sigma=0.1, pad_image=True, normalize_patch='none'),
-            losses.MMDApproximate(patch_size=5, strides=2, sigma=0.04,pool_size=32, pool_strides=16, r=128, normalize_patch='channel_mean')#, patch_size=11, sigma=0.01)
-            # losses.MMDApproximate(patch_size=5, strides=1, sigma=0.03,pool_size=128, pool_strides=1, r=128, normalize_patch='channel_mean')#, patch_size=11, sigma=0.01)
-            # losses.PatchSWDLoss(patch_size=3, stride=1, normalize_patch='channel_mean', r=128)  # , patch_size=11, sigma=0.01)
+    # criterion = losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv2_2', 1)])
+    # criterion.name = "VGG-rand-conv2_2"
 
-    ], weights=[0.06, 1.0])
-    criterion.name = "MMD++no-localtem(5:2)"
+    criterion = losses.SSIM_2()
+    # criterion = losses.PyramidLoss(losses.GradLoss3Channels(batch_reduction='none'), max_levels=2, weightening_mode=[0.1, 0.3, 1])
+    # criterion.name = "pyramid-3c-grad"
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     glo_trainer = GLOTrainer(glo_params, generator, criterion, train_dataset, device)
-    # glo_trainer._load_ckpt(outptus_dir)
+    glo_trainer._load_ckpt(outptus_dir)
     glo_trainer.train(outptus_dir, epochs=glo_params.num_epochs)
 
 
@@ -118,6 +112,6 @@ def test_models(train_dir):
 if __name__ == '__main__':
     # plot_GLO_variance()
     train_GLO('ffhq', "ffhq_128_512-z", '')
-    # train_dir = os.path.join('outputs', 'ffhq_128_512-z', 'VGG-PT-conv2_2')
+    # train_dir = os.path.join('outputs', 'ffhq_128_512-z', 'SSIM')
     # train_latent_samplers(train_dir)
     # test_models(train_dir)

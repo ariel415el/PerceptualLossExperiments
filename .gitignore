@@ -28,5 +28,6 @@
 /image_retargeting/images
 /image_retargeting/optimized_images_outputs
 /cnn_visuzlization/Outputs
+/cnn_visuzlization/images
 /losses/gabor_loss/*.pth
 /losses/gabor_loss/*.png

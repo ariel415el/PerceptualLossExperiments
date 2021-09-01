@@ -20,7 +20,7 @@ class GLOTrainer:
         self.device = device
         self.glo_params = glo_params
         self.generator = generator.to(device)
-        self.generator.apply(weights_init)
+
         self.criterion = criterion.to(device)
 
         self.dataloader = GenerativeModels.utils.data_utils.get_dataloader(dataset, self.glo_params.batch_size, self.device)
@@ -28,6 +28,7 @@ class GLOTrainer:
         # Define the learnable input codes
         self.latent_codes = LatentCodesDict(self.glo_params.z_dim, len(dataset)).to(device)
         self.latent_codes.apply(weights_init)
+        # self.latent_codes.emb.weight.data = torch.load('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/GenerativeModels/GLO/outputs/ffhq_128_512-z/L2/latent_codes.pth', map_location=device)['emb.weight']
 
         # Define optimizers
         self.optimizerG = optim.Adam(self.generator.parameters(),
