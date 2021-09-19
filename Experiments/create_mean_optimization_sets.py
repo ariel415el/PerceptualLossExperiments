@@ -31,10 +31,10 @@ def center_crop_image_to_square(img, edge_perc=None):
     h = img.shape[0]
     w = img.shape[1]
     if h > w:
-        e = (h - w) // 2
+        e = int(np.ceil((h - w) / 2))
         img = img[e:-e]
     elif h < w:
-        e = (w - h) // 2
+        e = int(np.ceil((w - h) / 2))
         img = img[:, e:-e]
     if edge_perc:
         z = int(img.shape[0] * edge_perc)

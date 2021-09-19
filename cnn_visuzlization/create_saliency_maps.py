@@ -81,8 +81,9 @@ class VanillaBackprop:
 def show_saliency_maps(net, dataloader, resize_patch, output_dir, device, n_images=10, n_channels=10):
     VBP = VanillaBackprop(net, guided=True)
     image_indices = np.random.choice(range(len(dataloader.dataset)), n_images, replace=False)
-    c_indices =  np.random.choice(range(net.m_n_maps), n_channels, replace=False)
-    # n_patches = 32
+    c_indices = np.random.choice(range(net.m_n_maps), n_channels, replace=False)
+    # image_indices = [154]
+    # c_indices = [37]
     for img_idx in image_indices:
         img_dir = f"{output_dir}/{img_idx}"
         image = torch.from_numpy(dataloader.dataset[img_idx][1]).to(device).float().unsqueeze(0)
@@ -102,4 +103,9 @@ def show_saliency_maps(net, dataloader, resize_patch, output_dir, device, n_imag
             save_scaled_images(image_grads, resize_patch, f"{img_dir}/channels/c-{c_idx}_image_grads.png")
             save_scaled_images(patch_grads, resize_patch, f"{img_dir}/channels/c-{c_idx}_patch_grads.png")
             save_scaled_images(activations[c_idx], resize_patch, f"{img_dir}/channels/c-{c_idx}_activations.png")
+
+            from torchvision.transforms import transforms
+            no_padding_image_grads = image_grads[:, :, net.m_receptive_field//2:-net.m_receptive_field//2, net.m_receptive_field//2:-net.m_receptive_field//2]
+            weighted_image_grads = transforms.Resize((no_padding_image_grads.shape[2], no_padding_image_grads.shape[3]), antialias=True)(activations[c_idx])
+            save_scaled_images(no_padding_image_grads * weighted_image_grads.unsqueeze(0), resize_patch, f"{img_dir}/channels/c-{c_idx}_scaled_image_grads.png")
 

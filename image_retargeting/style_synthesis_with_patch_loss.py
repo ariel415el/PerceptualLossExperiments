@@ -10,14 +10,8 @@ import torchvision.utils as vutils
 import sys
 
 from image_retargeting.utils import aspect_ratio_resize
-from losses.composite_losses.laplacian_losses import LaplacyanLoss
-from losses.composite_losses.list_loss import LossesList
-from losses.composite_losses.pyramid_loss import PyramidLoss
-from losses.composite_losses.window_loss import WindowLoss
-from losses.swd.patch_swd import PatchSWDLoss
-
-from losses.mmd.patch_mmd import PatchMMDLoss, compute_MMD
-
+from perceptual_mean_optimization.utils import cv2pt
+import losses
 sys.path.append(os.path.realpath(".."))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -37,7 +31,7 @@ def optimize_texture(target_texture, criterias, output_dir=None, num_steps=400, 
     """
     :param images: tensor of shape (H, W, C)
     """
-    scale_x, scale_y = 1.5,0.7
+    scale_x, scale_y = 1.5, 0.7
     # scale_x, scale_y = 1,1
     H,W = target_texture.shape[0], target_texture.shape[1]
 
@@ -108,55 +102,20 @@ def run_sigle():
         # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/long_grass.jpeg',
         # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/textures/rug.jpeg',
         # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/patch_dist/building.bmp',
-        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/patch_dist/fruit.png',
+        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/images/fruit.png',
         # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/patch_dist/girafs.png',
-        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/singan/balloons.png',
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/singan/balloons.png',
     ]
 
-    losses = [
-        # PatchSWDLoss(patch_size=9, num_proj=256, n_samples=2048),
-        # PatchMMDLoss(patch_size=9, n_samples=2048)
-        # LaplacyanLoss(PatchMMDLoss(patch_size=15, n_samples=512), weightening_mode=3, max_levels=2),
+    criterias = [
 
-        # LossesList([
-        #     PatchMMDLoss(patch_size=31, stride=15, n_samples=4096),
-        #     PatchMMDLoss(patch_size=11, stride=5, n_samples=4096),
-        # PatchMMDLoss(patch_size=3, stride=2, n_samples=4096),
-        # LossesList([
-        #     PatchMMDLoss(patch_size=61, stride=30, n_samples=4096),
-        #     PatchMMDLoss(patch_size=51, stride=25, n_samples=4096),
-        #     PatchMMDLoss(patch_size=41, stride=20, n_samples=4096),
-        #     PatchMMDLoss(patch_size=31, stride=15, n_samples=4096),
-        #     PatchMMDLoss(patch_size=21, stride=10, n_samples=4096),
-        #     PatchMMDLoss(patch_size=11, stride=5, n_samples=4096),
-        # ], weights=[1,1,1,1,1,1], name=f'multipatchMMD2'),
-        # ], weights=[0.3, 0.3, 0.3])
-        # PatchMMDLoss(patch_size=3, stride=2, n_samples=4096),
-        # PatchMMDLoss(patch_size=31, stride=1, n_samples=4096),
-        # PatchMMDLoss(patch_size=11, stride=1, n_samples=4096),
-        # WindowLoss(PatchSWDLoss(patch_size=11, stride=1, n_samples=4096, num_proj=1024), window_size=32, stride=16),
-        # PatchSWDLoss(patch_size=11, stride=1, n_samples=4096, num_proj=1024, sample_same_locations=False),
-        # PatchSWDLoss(patch_size=31, stride=15, n_samples=4096, sample_same_locations=False),
-        # PatchMMDLoss(patch_size=15, stride=8, n_samples=4096, sample_same_locations=False),
-        # PatchMMDLoss(patch_size=31, stride=15, n_samples=4096, sample_same_locations=False),
-        # PatchMMDLoss(patch_size=64, stride=32, n_samples=4096, sample_same_locations=False),
-        # PatchMMDLoss(patch_size=11, stride=5, n_samples=4096, sample_same_locations=False)
-        PyramidLoss(PatchMMDLoss(patch_size=11, stride=5, n_samples=4096, sample_same_locations=False), weightening_mode=3, max_levels=3),
-        # PatchSWDLoss(patch_size=5, stride=1, n_samples=4096, num_proj=1024),
-        # PatchMMDLoss(patch_size=5, stride=2, n_samples=1024),
-        # PatchMMDLoss(patch_size=7, stride=3, n_samples=1024),
-        # PatchMMDLoss(patch_size=5, stride=1, n_samples=1024)
+        losses.PyramidLoss(losses.PatchMMD_RBF(patch_size=11, stride=5, n_samples=4096, sample_same_locations=False), weightening_mode=3, max_levels=3),
 
-        # PatchSWDLoss(patch_size=11, stride=1, n_samples=4096, num_proj=1024),
-        # LaplacyanLoss(PatchMMDLoss(patch_size=19, n_samples=1024), weightening_mode=3, max_levels=2),
-        # WindowLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), window_size=32, stride=16),
-        # PyramidLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), weightening_mode=3, max_levels=3),
-        # LaplacyanLoss(PatchMMDLoss(patch_size=11, n_samples=1024, sample_same_locations=False), weightening_mode=3, max_levels=3)
     ]
-    exp_name = "_".join([l.name for l in losses])
+    exp_name = "_".join([l.name for l in criterias])
     for path in images:
         img_name = os.path.basename(os.path.splitext(path)[0])
-        input_dir = f"Experiments/style_synthesis/{img_name}"
+        input_dir = f"style_synthesis/{img_name}"
         os.makedirs(input_dir, exist_ok=True)
 
         texture_image = cv2.imread(path)
@@ -168,7 +127,7 @@ def run_sigle():
         train_dir = f"{input_dir}/{exp_name}"
         os.makedirs(train_dir, exist_ok=True)
 
-        img = optimize_texture(texture_image, losses, output_dir=train_dir, num_steps=100000, lr=0.005)
+        img = optimize_texture(texture_image, criterias, output_dir=train_dir, num_steps=100000, lr=0.005)
         vutils.save_image(img, os.path.join(input_dir, f"{exp_name}.png"), normalize=True)
 
 

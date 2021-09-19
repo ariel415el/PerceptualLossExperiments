@@ -11,6 +11,8 @@ import losses
 from perceptual_mean_optimization.utils import cv2pt
 import torchvision.utils as vutils
 from torchvision import transforms
+from losses.composite_losses.laplacian_losses import conv_gauss
+from losses.composite_losses.laplacian_losses import get_kernel_gauss
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -65,65 +67,82 @@ def match_patch_distributions(input_img, target_img, criterias, num_steps, lr, o
     return torch.clip(optimized_variable.detach()[0], -1, 1)
 
 
-def retarget_image(img_path, criterias, output_dir):
-    n_scales = 5
-    perc = 0.75
-    num_steps = 5000
-    lr = 0.005
+def retarget_image(img_path, criterias, output_dir, n_scales, percentage,
+                   aspect_ratio=(1,1), resize=256, num_steps=2000, lr=0.001, init='noise'):
     img = cv2.imread(img_path)
-    img = aspect_ratio_resize(img, max_dim=256)
+    img = aspect_ratio_resize(img, max_dim=resize)
     img = cv2pt(img)
 
-    pyramid = get_pyramid(img, n_scales, perc)
-
-    synthesis = torch.randn(pyramid[0].shape) * 0.1
+    pyramid = get_pyramid(img, n_scales, percentage)
 
     for lvl, lvl_img in enumerate(pyramid):
         print(f"Starting lvl {lvl}")
+        h, w = int(lvl_img.shape[1] * aspect_ratio[0]), int(lvl_img.shape[2] * aspect_ratio[1])
+        if lvl == 0:
+            if init == 'noise':
+                synthesis = torch.randn((3, h, w)) * 0.1
+            else:
+                synthesis = transforms.Resize((h, w), antialias=True)(img)
+                synthesis = conv_gauss(synthesis.unsqueeze(0), get_kernel_gauss(size=21, sigma=21, n_channels=3))[0]
+                synthesis += torch.randn((3, h, w)) * 0.25
         if lvl > 0:
-            # synthesis = transforms.Resize((int(lvl_img.shape[1] * 1), int(lvl_img.shape[2] * 0.6)), antialias=True)(synthesis)
-            synthesis = transforms.Resize(lvl_img.shape[1:], antialias=True)(synthesis)
+                # synthesis = transforms.Resize((int(lvl_img.shape[1] * 1), int(lvl_img.shape[2] * 0.6)), antialias=True)(synthesis)
+                synthesis = transforms.Resize((h, w), antialias=True)(synthesis)
 
         lvl_output_dir = os.path.join(output_dir, str(lvl))
         vutils.save_image(lvl_img, os.path.join(output_dir, f"target-{lvl}.png"), normalize=True)
         vutils.save_image(synthesis, os.path.join(output_dir, f"org-{lvl}.png"), normalize=True)
 
-        synthesis = match_patch_distributions(synthesis, lvl_img, criterias, 6000 if lvl == 0 else 2000, lr,
+        synthesis = match_patch_distributions(synthesis, lvl_img, criterias, 2 * num_steps if lvl == 0 else num_steps, lr,
                                               lvl_output_dir)
-        lr *= 0.9  # n_scales / 10
-        # num_steps -= 500 # int(1.5* num_steps)
 
         vutils.save_image(synthesis, os.path.join(output_dir, f"final-{lvl}.png"), normalize=True)
 
 
 if __name__ == '__main__':
-    # img_path = 'images/balloons.png'
-    img_path = 'images/soccer1.png'
-    # img_path = 'images/soccer2.jpg'
-    # img_path = 'images/soccer3.jpg'
-    # img_path = 'images/jerusalem1.jpg'
-    img_path = 'images/jerusalem2.jpg'
-    # img_path = 'images/birds.png'
-    # img_path = 'images/girafs.png'
-    # img_path = 'images/cows.png'
-    # img_path = 'images/trees3.jpg'
-    # img_path = 'images/fruit.png'
-    criterias = [
-        (losses.PatchMMDLoss(patch_size=11, stride=3), 1, ),
-        # (losses.PatchMMDLoss(patch_size=5, stride=2), 1, ),
-        # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1), ('conv2_2', 1)], name='vgg-pt-conv1-2', features_metric_name='gram').to(device), 1),
-        # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)], name='vgg-pt-conv2_2', features_metric_name='gram').to(device), 1),
-        # (PatchSWDLoss(patch_size=11, stride=3, num_proj=1024), 1, ),
-    ]
-    criterias[0][0].name = 'MMD(11:3,dotprod)'
-    # target = cv2pt(cv2.imread('images/balloons.png'))
-    # starting = cv2pt(cv2.imread('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/optimized_images_outputs/balloons/PatchMMD(p-17:1)/final-5.png'))
-    # synthesis = match_patch_distributions(starting, target, criterias, 10000, 0.01, "single_outputs")
-    # exit()
+    for tag in ['#1', '#2', '#3']:
+        # img_path = 'images/balloons.png'
+        # img_path = 'images/fruit.png'
+        # img_path = 'images/birds.png'
+        # img_path = 'images/colusseum.png'
+        # img_path = 'images/SupremeCourt.jpeg'
+        # img_path = 'images/kanyon.jpg'
+        # img_path = 'images/soccer1.png'
+        # img_path = 'images/soccer2.jpg'
+        # img_path = 'images/soccer3.jpg'
+        # img_path = 'images/jerusalem1.jpg'
+        # img_path = 'images/jerusalem2.jpg'
+        # img_path = 'images/balls.jpg'
+        img_path = 'images/mountins2.jpg'
+        # img_path = 'images/people_on_the_beach.jpg'
+        # img_path = 'images/girafs.png'
+        # img_path = 'images/cows.png'
+        # img_path = 'images/trees3.jpg'
+        # img_path = 'images/fruit.png'
 
-    img_name = os.path.basename(os.path.splitext(img_path)[0])
-    exp_name = "_".join([l[0].name for l in criterias])
-    output_dir = f'optimized_images_outputs/{img_name}/{exp_name}'
-    os.makedirs(output_dir, exist_ok=True)
+        criterias = [
+            # (losses.PatchMMD_RBF(patch_size=7, stride=1), 1, ),
+            (losses.MMDApproximate(patch_size=7, strides=1, pool_size=-1, r=1024, sigma=0.05), 1)
+            # (losses.PatchMMDLoss(patch_size=5, stride=2), 1, ),
+            # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv1_2', 1), ('conv2_2', 1)], name='vgg-pt-conv1-2', features_metric_name='gram').to(device), 1),
+            # (losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)], name='vgg-pt-conv2_2', features_metric_name='gram').to(device), 1),
+            # (losses.PatchSWDLoss(patch_size=7, stride=1, num_proj=512), 1, ),
+        ]
+        # criterias[0][0].name = 'MMD(11:3,RB)'
+        # target = cv2pt(cv2.imread('images/balloons.png'))
+        # starting = cv2pt(cv2.imread('/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/optimized_images_outputs/balloons/PatchMMD(p-17:1)/final-5.png'))
+        # synthesis = match_patch_distributions(starting, target, criterias, 10000, 0.01, "single_outputs")
+        # exit()
+        outputs_dir = 'outputs/view_images'
+        resize = 256
+        init = 'noise'
+        # percentage = 0.7; n_scales = 4; aspect_ratio = (1, 0.5); lr = 0.005; num_steps = 1500
+        percentage = 0.75; n_scales = 5; aspect_ratio = (1, 1); lr = 0.005; num_steps = 1500
 
-    retarget_image(img_path, criterias, output_dir)
+        img_name = os.path.basename(os.path.splitext(img_path)[0])
+        exp_name = "_".join([l[0].name for l in criterias])
+        output_dir = f'{outputs_dir}/{img_name}/{exp_name}_AR-{aspect_ratio}_R-{resize}_S-{percentage}x{n_scales}_I-{init}_{tag}'
+        os.makedirs(output_dir, exist_ok=True)
+
+        retarget_image(img_path, criterias, output_dir, n_scales=n_scales, percentage=percentage,
+                       aspect_ratio=aspect_ratio, resize=resize, num_steps=num_steps, lr=lr, init=init)

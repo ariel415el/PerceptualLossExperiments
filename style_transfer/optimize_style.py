@@ -6,28 +6,19 @@ import os
 from matplotlib import pyplot as plt
 
 from Experiments.create_mean_optimization_sets import center_crop_image_to_square
-from losses.classic_losses.grad_loss import GradLoss3Channels, GradLoss
-from losses.classic_losses.l2 import L2
-from losses.composite_losses.laplacian_losses import LaplacyanLoss
-from losses.composite_losses.list_loss import LossesList
-from losses.composite_losses.pyramid_loss import PyramidLoss
-from losses.empty_loss import NoLoss
-from losses.mmd.patch_mmd import PatchMMDLoss
-from losses.mmd.windowed_patch_mmd import MMDApproximate
-from losses.swd.patch_swd import PatchSWDLoss
+import losses
 from perceptual_mean_optimization.utils import cv2pt
 from style_transfer.utils import imload, calc_TV_Loss
 from tqdm import tqdm
 import torchvision.utils as vutils
-
-from losses.vgg_loss.vgg_loss import VGGFeatures, get_features_metric, layer_names_to_indices, VGGPerceptualLoss
 
 from torchvision import transforms
 
 
 def imload(path, imsize, square_crop=True):
     img = cv2.imread(path)
-    img = center_crop_image_to_square(img)
+    if square_crop:
+        img = center_crop_image_to_square(img)
     img = cv2pt(img)
     img = transforms.Resize((imsize,imsize), antialias=True)(img)
     return img
@@ -74,48 +65,87 @@ def style_mix_optimization(content_image, style_image, content_criteria, style_c
                 g['lr'] *= 0.9
         pbar.set_description(f"total_loss: {total_loss}")
 
-
-if __name__ == '__main__':
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # device = torch.device("cpu")
-    max_iter = 1000
-    lr = 0.05
-    batch_size = 1
-    imsize = 256
-    style_weight = 30
-
-    content_loss = NoLoss()
-    # content_loss = VGGPerceptualLoss(pretrained=True, features_metric_name='l2', layers_and_weights=[('conv3_3', 1)])
-    # content_loss = GradLoss()
-    # content_loss = L2()
+    res = torch.clip(target_img, -1, 1)
+    return res
 
 
-    style_loss = VGGPerceptualLoss(pretrained=True, features_metric_name='gram', layers_and_weights=[('relu1_2', 1), ('relu2_2', 1), ('relu3_3', 1), ('relu4_3', 1), ('relu5_3', 1)])
-    # style_loss = PatchSWDLoss(patch_size=3, stride=1, num_proj=1024, normalize_patch='none')
-    # style_loss = PatchSWDLoss(patch_size=11, stride=3, normalize_patch='none')
-    # style_loss = LossesList([
-    #     PatchSWDLoss(patch_size=3, stride=1, num_proj=256),
-    #     PatchSWDLoss(patch_size=11, stride=1, num_proj=256),
-    # ], weights=[1,1])
-    # style_loss = PatchMMDLoss(patch_size=11, stride=3)
-    # style_loss = MMDApproximate(patch_size=11, strides=3, pool_size=128, pool_strides=128, sigma=0.1)
-
-    tag = ''
-    style_img_path = 'imgs/style/starry_night.jpg'
-    # style_img_path = 'imgs/style/scream.jpg'
-    # style_img_path = 'imgs/style/abstraction.jpg'
-    # style_img_path = 'imgs/content/chicago.jpg'
+def load_and_run(content_img_path, style_img_path, style_loss, content_loss):
     style_img_name = os.path.splitext(os.path.basename(style_img_path))[0]
 
-    content_img_path = 'imgs/content/chicago.jpg'
-    # content_img_path = 'imgs/content/home_alone.jpg'
-    # content_img_path = 'imgs/content/cornell.jpg'
     content_img_name = os.path.splitext(os.path.basename(content_img_path))[0]
 
-    train_dir = f"outputs/optimize_output_new/{content_img_name}_{style_img_name}/S({style_loss.name})_C({content_loss.name})-{tag}"
-
+    train_dir = f"{outputs_dir}/{content_img_name}/{style_img_name}/{style_weight}xS-({style_loss.name})+C({content_loss.name})-{tag}"
 
     content_img = imload(content_img_path, imsize).unsqueeze(0).to(device)
     style_img = imload(style_img_path, imsize).unsqueeze(0).to(device)
 
-    style_mix_optimization(content_img, style_img, content_loss.to(device), style_loss.to(device), lr, max_iter, train_dir, device)
+    mix = style_mix_optimization(content_img, style_img, content_loss.to(device), style_loss.to(device), lr, max_iter, train_dir, device)
+
+    return content_img, style_img, mix
+
+if __name__ == '__main__':
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
+    outputs_dir = 'outputs_inpaintings'
+    max_iter = 600
+    lr = 0.05
+    batch_size = 1
+    imsize = 256
+    style_weight = 30
+    tag = 'mean'
+
+    all_content_images = [
+        # 'imgs/content/chicago.jpg',
+        # 'imgs/content/bair.jpg',
+        # 'imgs/content/home_alone.jpg',
+        # 'imgs/content/cornell.jpg',
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/images/balls_green.jpg'
+        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00001_bw.png'
+    ]
+
+    all_style_images = [
+            # 'imgs/style/yellow_sunset.jpg',
+            # 'imgs/style/starry_night.jpg',
+            # # 'imgs/style/Vincent_van_Gogh_Olive_Trees.jpg',
+            # 'imgs/style/scream.jpg',
+            # # 'imgs/style/abstraction.jpg',
+            # 'imgs/style/Muse.jpg',
+            # 'imgs/style/mondrian.jpg',
+            # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/images/balls.jpg'
+            '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00020.png'
+    ]
+
+    all_content_losses = [
+                # losses.NoLoss(),
+                losses.PyramidLoss(losses.GradLoss3Channels(), max_levels=3, weightening_mode=[1, 0, 0, 0]),
+                # losses.VGGPerceptualLoss(pretrained=True, features_metric_name='l2', layers_and_weights=[('conv3_3', 1)])
+                # GradLoss()
+                # losses.L2()
+    ]
+
+    all_style_losses = [
+            # losses.VGGPerceptualLoss(pretrained=True, features_metric_name='gram', layers_and_weights=[('relu1_2', 1), ('relu2_2', 1), ('relu3_3', 1), ('relu4_3', 1), ('relu5_3', 1)]),
+            # losses.PatchMMD_RBF(patch_size=7, stride=3),
+            losses.PatchSWDLoss(patch_size=11, stride=1, num_proj=1024, normalize_patch='mean'),
+            # losses.PatchSWDLoss(patch_size=11, stride=3, num_proj=1024)
+            # losses.PatchSWDLoss(patch_size=15, stride=3, num_proj=1024),
+            # losses.PatchSWDLoss(patch_size=31, stride=3, num_proj=1024)
+            # losses.MMDApproximate(patch_size=7, strides=1, pool_size=-1, sigma=0.03, normalize_patch='mean')
+    ]
+
+    content_loss = all_content_losses[0]
+    style_loss = all_style_losses[0]
+    all_rows = []
+    first_row = []
+    for i, content_img_path in enumerate(all_content_images):
+        row = []
+        for style_img_path in all_style_images:
+            content_img, style_img, mix = load_and_run(content_img_path, style_img_path, style_loss, content_loss)
+            row.append(mix)
+            if i  == 0:
+                first_row.append(style_img)
+        row = [content_img] + row
+        all_rows.append(torch.cat(row, dim=0))
+    first_row = torch.cat([torch.ones_like(first_row[0])] + first_row, axis=0)
+    all_rows = [first_row] + all_rows
+    vutils.save_image(torch.cat(all_rows, axis=0), f"{outputs_dir}/{style_loss.name}_output.png", normalize=True, nrow=1 + len(all_style_images))

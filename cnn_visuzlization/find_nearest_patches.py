@@ -20,6 +20,10 @@ def get_random_patch_with_activation(net, dataloader, device, sample_from_face_o
 
     if sample_from_face_only:
         dim = int(np.sqrt(feature_maps.shape[-1]))
+        # eyes
+        # w_idx = np.random.randint(low=int(dim // 2 - dim // 4), high=int(dim / 2 + dim / 4), size=1)
+        # h_idx = np.random.randint(low=int(dim *0.425), high=int(dim *0.475), size=1)
+        # face
         h_idx, w_idx = np.random.randint(low=int(dim // 2 - dim // 4), high=int(dim / 2 + dim / 4), size=2)
         patch_idx = dim * h_idx + w_idx
     else:
@@ -78,7 +82,7 @@ def show_patch_nearest_neighbors(net, dataloader, resize_patch, output_dir, devi
     os.makedirs(output_dir, exist_ok=True)
     for i in range(n_patches):
         with torch.no_grad():
-            patch, activation, image = get_random_patch_with_activation(net, dataloader, device)
+            patch, activation, image = get_random_patch_with_activation(net, dataloader, device, sample_from_face_only=True)
 
             patches, imgs, _ = find_most_activating_patches(net, dataloader, activation.cpu().numpy(), n_best, device, similarity_mode='l2')
         save_scaled_images(patches, resize_patch, f"{output_dir}/{i}_1-similar-vgg-patches.png")
@@ -86,11 +90,11 @@ def show_patch_nearest_neighbors(net, dataloader, resize_patch, output_dir, devi
         import losses
         for j, loss in enumerate([
             losses.L2(batch_reduction='none'),
-            losses.MMDApproximate(patch_size=5, strides=2, sigma=0.05, r=32, pool_size=24, pool_strides=1, batch_reduction='none', normalize_patch='mean'),
+            losses.MMDApproximate(patch_size=5, strides=1, sigma=0.05, r=32, pool_size=net.m_receptive_field, pool_strides=1, batch_reduction='none', normalize_patch='mean'),
             # losses.GradLoss(batch_reduction='none'),
             # losses.PyramidLoss(losses.L2(batch_reduction='none'), max_levels=2, weightening_mode=[0, 0.1, 1]),
-            losses.PyramidLoss(losses.GradLoss(batch_reduction='none'), max_levels=2, weightening_mode=[0.1, 0.3, 1])
-            # losses.SSIM(bat)
+            losses.PyramidLoss(losses.GradLoss(batch_reduction='none'), max_levels=2, weightening_mode=[0.1, 0.3, 1]),
+            losses.SSIM(patch_size=net.m_receptive_field, batch_reduction='none')
         ]):
             patches, images = find_euclidean_nearest_neighbors(patch, dataloader, net.m_receptive_field, net.m_stride,
                                                                n_best, loss=loss)

@@ -90,8 +90,8 @@ def get_single_conv_vgg(cfg, drop_last_relu=False, load_weights=True, inplace_re
     net = nn.Sequential(*features)
 
     if load_weights:
-        # state_dict = torch.load('../losses/vgg_loss/vgg16_head.pth')
-        state_dict = torch.load('../losses/vgg_loss/vgg16-VGGFace.pth')
+        state_dict = torch.load('../losses/vgg_loss/vgg16_head.pth')
+        # state_dict = torch.load('../losses/vgg_loss/vgg16-VGGFace.pth')
         state_dict = {k.replace('features.', ''):v for k,v in state_dict.items() if k.replace('features.', '') in net.state_dict()}
         net.load_state_dict(state_dict)
 

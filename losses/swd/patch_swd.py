@@ -15,6 +15,7 @@ def compute_swd(x, y, num_proj=256):
     # sort by first dimension means each column is sorted separately
     proj1, _ = torch.sort(proj1, dim=0)
     proj2, _ = torch.sort(proj2, dim=0)
+    # proj1 = proj1[:proj2.shape[0]]
     d = torch.abs(proj1 - proj2)
     return torch.mean(d)
 

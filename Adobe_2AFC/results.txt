@@ -36,3 +36,7 @@ AlexNet_1_pt:                                0.688/0.00
 AlexNet_1_rand:                              0.676/0.00
 AlexNet_4_pt:                                0.747/0.00
 AlexNet_4_rand:                              0.679/0.00
+criterion: mean/std
+SSIM(w=11,s=1.5): 0.696/0.00
+criterion: mean/std
+SSIM(w=1.5,s=1.5): 0.696/0.00

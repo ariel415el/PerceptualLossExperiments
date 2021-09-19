@@ -53,10 +53,13 @@ class MMDApproximate(torch.nn.Module):
         self.pool_size = pool_size
         if pool_size > 1:
             self.pool = torch.nn.AvgPool2d(kernel_size=pool_size, stride=pool_strides)
+        elif pool_size == -1:
+            def GAP(x):
+                return torch.nn.functional.avg_pool2d(x, x.shape[-2:], 1, 0)
+            self.pool = GAP
         else:
             def no_op(x):
                 return x
-
             self.pool = no_op
         self.ksize = patch_size
         self.strides = strides
@@ -92,7 +95,6 @@ class MMDApproximate(torch.nn.Module):
         w = w.to(x.device)
         b = b.to(x.device)
         act_x = torch.cos(conv2d(x, w, b, self.strides))
-        self.pool = torch.nn.AvgPool2d(kernel_size=act_x.shape[2:], stride=1)
         x_feats = self.pool(act_x)
         act_y = torch.cos(conv2d(y, w, b, self.strides))
         y_feats = self.pool(act_y)

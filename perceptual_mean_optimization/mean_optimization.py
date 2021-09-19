@@ -116,14 +116,15 @@ def optimize_multi_scale_patch_distribution(starting_img, target_images, criteri
 
 def optimize_mean(image_dirs, losses, n_images, start_mode, output_dir_root, multi_scale):
     lr = 0.001
-    n_steps = 2000
+    n_steps = 15000
     plotter = Plotter(len(losses), len(image_dirs))
 
     # RUN OPTIMIZATION AND MAIN PLOT
     for i, images_dir in enumerate(image_dirs):
         images_name = os.path.basename(images_dir)
         images = load_images(images_dir)[:n_images]
-        starting_img = get_starting_point(images, start_mode)
+        # starting_img = get_starting_point(images, start_mode)
+        starting_img = get_starting_point(load_images('clusters/z_samples_new/16/data_neighbors16')[:10], start_mode)
 
         plotter.set_result(i, 0, pt2cv(starting_img.detach().cpu()), 'Starting img' if i == 0 else None)
 
@@ -156,7 +157,7 @@ def optimize_mean(image_dirs, losses, n_images, start_mode, output_dir_root, mul
 
 if __name__ == '__main__':
     image_dirs = [
-        'clusters/view/balloons',
+        # 'clusters/view/balloons',
         # 'clusters/view/birds',
         # 'clusters/view/birds_dusk',
         # 'clusters/view/colos',
@@ -175,7 +176,7 @@ if __name__ == '__main__':
 
         # Synthetic:
         # 'clusters/synthetic/box_dataset',
-        'clusters/synthetic/color_box_dataset',
+        # 'clusters/synthetic/color_box_dataset',
 
         # Jitters:
         # 'clusters/ffhq_jitters/00068_128',
@@ -186,7 +187,7 @@ if __name__ == '__main__':
         # 'clusters/increasing_variation/36126_s128_c_128',
 
         # Textures:
-        'clusters/textures/ball-on-grass_e-7_z-0.2',
+        # 'clusters/textures/ball-on-grass_e-7_z-0.2',
         # 'clusters/textures/dry_grass_e-7_z-0.2',
         # 'clusters/textures/dry_needle_e-7_z-0.2',
         # 'clusters/textures/cobbles_e-7_z-0.2',
@@ -197,21 +198,19 @@ if __name__ == '__main__':
 
     ]
     losses = [
-        # losses.AlexNetLoss(pretrained=True, n_maxpools=2),
-        losses.AlexNetLoss(pretrained=True, n_maxpools=1),
-        losses.AlexNetLoss(pretrained=False, n_maxpools=1),
-        losses.AlexNetLoss(pretrained=True, n_maxpools=4),
-        losses.AlexNetLoss(pretrained=False, n_maxpools=4),
-        losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)], name='vgg-pt-conv2_2'),
-        losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv3_1', 1)], name='vgg-pt-conv3_1'),
-        losses.VGGPerceptualLoss(pretrained=False, reinit=False, norm_first_conv=False, layers_and_weights=[('conv2_2', 1)], name='vgg-rand-conv2_2'),
-        losses.VGGPerceptualLoss(pretrained=False, reinit=False, norm_first_conv=False, layers_and_weights=[('conv3_1', 1)], name='vgg-rand-conv3_1'),
-        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv3_1', 1)])
+        losses.MMDApproximate(patch_size=11, strides=1, sigma=0.01, r=128, pool_size=128, pool_strides=1),
+        losses.PatchSWDLoss(patch_size=11, stride=3, num_proj=512),
+        losses.PatchMMD_RBF(patch_size=11, stride=3),#, sigmas=[0.01]),
+        # losses.PatchMMD_DotProd(patch_size=11, stride=6),
+        # losses.PatchMMD_SSIM(patch_size=11, stride=6),
+        # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv2_2', 1)]),
+        # losses.SSIM(patch_size=11,sigma=1.5),
+        # losses.SSIM(patch_size=5,sigma=1.5),
     ]
 
 
-    n_images = 1
-    start_mode = 'zeros+noise'
+    n_images = 10
+    start_mode = 'mean'
     # start_mode = 'mean'
     multi_scale = False
     tag = f""

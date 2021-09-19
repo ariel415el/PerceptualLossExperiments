@@ -39,13 +39,13 @@ def train_GLO(dataset_name, train_name, tag):
     # criterion = losses.VGGPerceptualLoss(pretrained=False, reinit=True, norm_first_conv=True, layers_and_weights=[('conv2_2', 1)])
     # criterion.name = "VGG-rand-conv2_2"
 
-    criterion = losses.SSIM_2()
+    criterion = losses.SSIM()
     # criterion = losses.PyramidLoss(losses.GradLoss3Channels(batch_reduction='none'), max_levels=2, weightening_mode=[0.1, 0.3, 1])
     # criterion.name = "pyramid-3c-grad"
 
     outptus_dir = os.path.join('outputs', train_name, criterion.name + tag)
     glo_trainer = GLOTrainer(glo_params, generator, criterion, train_dataset, device)
-    glo_trainer._load_ckpt(outptus_dir)
+    # glo_trainer._load_ckpt(outptus_dir)
     glo_trainer.train(outptus_dir, epochs=glo_params.num_epochs)
 
 

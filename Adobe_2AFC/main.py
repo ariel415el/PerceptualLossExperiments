@@ -64,10 +64,7 @@ def main():
         # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv3_3', 1)], batch_reduction='none', name='vgg-conv3_3'),
         # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv4_3', 1)], batch_reduction='none', name='vgg-conv4_3'),
         # losses.VGGPerceptualLoss(pretrained=True, layers_and_weights=[('conv5_3', 1)], batch_reduction='none', name='vgg-onv5_3'),
-        losses.AlexNetLoss(pretrained=True, n_maxpools=1, batch_reduction='none'),
-        losses.AlexNetLoss(pretrained=False, n_maxpools=1, batch_reduction='none'),
-        losses.AlexNetLoss(pretrained=True, n_maxpools=4, batch_reduction='none'),
-        losses.AlexNetLoss(pretrained=False, n_maxpools=4, batch_reduction='none')
+        losses.SSIM(batch_reduction='none')
     ]
 
     dataloader = get_dataloader([
