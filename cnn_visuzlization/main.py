@@ -31,11 +31,14 @@ if __name__ == '__main__':
     dataloader = create_dataloader(dataset_name, batch_size=batch_size, resize=resize, device=device)
 
     tag = f"vgg-{dataset_name}_{net.m_receptive_field}" + ("_pt" if load_weights else '_rand')
+
     # Run experiments
-    # output_dir = f"Outputs/{architecture}-{cfg}_{tag}_highly_activated_patches"
-    # show_most_activating_patches(net, dataloader, resize_patch=3, output_dir=output_dir, device=device, n_best=25, n_channels=20)
-    # output_dir = f"Outputs/{architecture}-{cfg}_{tag}_nearest_neighbor_patches"
-    # show_patch_nearest_neighbors(net, dataloader, resize_patch=3, output_dir=output_dir, device=device, n_best=25, n_patches=20)
+    output_dir = f"Outputs/{architecture}-{cfg}_{tag}_highly_activated_patches"
+    show_most_activating_patches(net, dataloader, resize_patch=3, output_dir=output_dir, device=device, n_best=25, n_channels=20)
+
+    output_dir = f"Outputs/{architecture}-{cfg}_{tag}_nearest_neighbor_patches"
+    show_patch_nearest_neighbors(net, dataloader, resize_patch=3, output_dir=output_dir, device=device, n_best=25, n_patches=20)
+
     output_dir = f"Outputs/{architecture}-{cfg}_{tag}_saliency_maps"
     show_saliency_maps(net, dataloader, resize_patch=3, output_dir=output_dir, device=device, n_images=10, n_channels=256)
 

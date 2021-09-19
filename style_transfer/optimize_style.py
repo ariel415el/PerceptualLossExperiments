@@ -142,7 +142,7 @@ if __name__ == '__main__':
         for style_img_path in all_style_images:
             content_img, style_img, mix = load_and_run(content_img_path, style_img_path, style_loss, content_loss)
             row.append(mix)
-            if i  == 0:
+            if i == 0:
                 first_row.append(style_img)
         row = [content_img] + row
         all_rows.append(torch.cat(row, dim=0))

@@ -1,9 +1,9 @@
 import torch.nn
 
 from losses.composite_losses.window_loss import WindowLoss
-from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.mmd.approximate_patch_mmd import MMDApproximate
 from losses.classic_losses.lap1_loss import *
-from losses.patch_loss import *
+from losses.local_term_loss import *
 from losses.swd.patch_swd import PatchSWDLoss
 from torch.nn.functional import conv2d, mse_loss, avg_pool2d
 

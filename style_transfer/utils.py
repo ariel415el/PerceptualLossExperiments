@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 # mean and std of ImageNet to use pre-trained VGG
 from losses.vgg_loss.gram_loss import gram_loss
 
+
 def imload(path, imsize=None, cropsize=None):
     IMAGENET_MEAN = (0.485, 0.456, 0.406)
     IMAGENET_STD = (0.229, 0.224, 0.225)

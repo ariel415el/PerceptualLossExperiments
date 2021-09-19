@@ -11,7 +11,7 @@ from losses.composite_losses.list_loss import LossesList
 from losses.composite_losses.pyramid_loss import PyramidLoss
 from losses.experimental_patch_losses import MMD_PP
 from losses.mmd.patch_mmd import *
-from losses.mmd.windowed_patch_mmd import MMDApproximate
-from losses.patch_loss import PatchRBFLoss
+from losses.mmd.approximate_patch_mmd import MMDApproximate
+from losses.local_term_loss import PatchRBFLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 from losses.alexnet_loss.alexnet_loss import AlexNetLoss

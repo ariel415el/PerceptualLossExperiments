@@ -28,6 +28,9 @@ def optimize_patch(net, c_idx, n_patches, n_steps, device):
 
 
 def show_most_activating_patches(net, dataloader, resize_patch, output_dir, device, n_best, n_channels=10):
+    """
+    Find patches in the dataset wich activate a specific neuron (channel of a specific feature map) to the highest intencities
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     all_patch_activations_heatmap = []

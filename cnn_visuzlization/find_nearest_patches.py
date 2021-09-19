@@ -79,6 +79,9 @@ def find_euclidean_nearest_neighbors(patch, dataloader, receptive_field, stride,
 
 
 def show_patch_nearest_neighbors(net, dataloader, resize_patch, output_dir, device, n_best, n_patches):
+    """
+    Select few random patches and show their nearest neighbor in the dataset with perceptual distance and other different metricss
+    """
     os.makedirs(output_dir, exist_ok=True)
     for i in range(n_patches):
         with torch.no_grad():

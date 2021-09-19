@@ -140,6 +140,10 @@ def collect_feature_map_similarities(net, dataloader, feature_vec, device, mode=
 
 
 def find_most_activating_patches(net, dataloader, feature_vec, n_best, device, similarity_mode='l2'):
+    """
+    Find the most patches with feature activations most similar to "feature_vec" from all patches in all images in dataloader
+    with the supplied metric
+    """
     imgs = []
     activated_patches = []
 

@@ -5,6 +5,7 @@ from PIL import Image
 import torch
 import numpy as np
 
+
 class TwoAFCDataset(Dataset):
     def __init__(self, dataroots, load_size=64):
         super(TwoAFCDataset, self).__init__()

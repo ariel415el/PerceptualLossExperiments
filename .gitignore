@@ -3,8 +3,8 @@
 *__pycache*
 *pyc*
 
-/losses/gabor_loss/*.pth
-/losses/gabor_loss/*.png
+/losses/**/*.pth
+/losses/**/*.png
 
 /kmeans/output_dir
 /kmeans/pmo_output_dir
@@ -16,14 +16,10 @@
 /GenerativeModels/Experiments_outputs
 
 /style_transfer/outputs
-/style_transfer/new_outputs
-/style_transfer/outputs_inpaintings
 /style_transfer/imgs
 
 /perceptual_mean_optimization/clusters
-/perceptual_mean_optimization/single_outputs
 /perceptual_mean_optimization/outputs
-/perceptual_mean_optimization/2_images_outputs
 
 /Experiments/compare_trained_generators_losses_outputs
 /Experiments/trained_models

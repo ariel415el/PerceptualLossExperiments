@@ -4,15 +4,21 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-from losses.mmd.patch_mmd import PatchMMDLoss
-from losses.mmd.windowed_patch_mmd import MMDApproximate
+import losses
+
 from perceptual_mean_optimization.mean_optimization import get_starting_point, optimize_patch_distributions
 from perceptual_mean_optimization.utils import pt2cv, load_images
 
-if __name__ == '__main__':
+
+
+def main():
+    """
+    generate an image with minimal MMD distance from two images and compare it to a huristic solution
+    :return:
+    """
     # criteria = MMDApproximate(r=128, pool_size=32, pool_strides=16, normalize_patch='none')
-    criteria = PatchMMDLoss(patch_size=11, stride=11)
-    images = load_images('clusters/textures/mixed/dry+longgrass',)[:2]
+    criteria = losses.PatchMMD_RBF(patch_size=11, stride=11)
+    images = load_images('../perceptual_mean_optimization/clusters/textures/mixed/dry+longgrass',)[:2]
     # starting_img = get_starting_point(images, 'zeros+noise')
     starting_img = get_starting_point(images, 'mean+noise')
 
@@ -42,3 +48,6 @@ if __name__ == '__main__':
     axs[2].axis('off')
 
     fig.savefig(os.path.join("2_images_outputs", 'res.png'))
+
+if __name__ == '__main__':
+    main()
