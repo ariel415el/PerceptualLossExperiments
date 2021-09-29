@@ -12,7 +12,7 @@ from GenerativeModels import models
 from GenerativeModels.config import default_config
 from GenerativeModels.models import weights_init
 from GenerativeModels.utils.data_utils import get_dataset, get_dataloader
-from losses.mmd.windowed_patch_mmd import MMDApproximate
+from losses.mmd.approximate_patch_mmd import MMDApproximate
 from losses.experimental_patch_losses import MMD_PP
 from losses.vgg_loss.vgg_loss import VGGFeatures, VGGPerceptualLoss
 

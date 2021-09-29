@@ -7,37 +7,52 @@ import cv2
 import torch
 
 from image_retargeting.utils import aspect_ratio_resize, get_pyramid, quantize_image
-import losses
 from perceptual_mean_optimization.utils import cv2pt
 import torchvision.utils as vutils
 from torchvision import transforms
 from losses.composite_losses.laplacian_losses import conv_gauss
 from losses.composite_losses.laplacian_losses import get_kernel_gauss
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
+
+def tv_loss(img):
+    w_variance = torch.mean(torch.pow(img[:,:,:,:-1] - img[:,:,:,1:], 2))
+    h_variance = torch.mean(torch.pow(img[:,:,:-1,:] - img[:,:,1:,:], 2))
+    return h_variance + w_variance
 
 
-def match_patch_distributions(input_img, target_img, criteria, num_steps, lr, output_dir):
+def blur_loss(x, y):
+    h,w = x.shape[-1] // 8, x.shape[-2] // 8
+    x_ds = transforms.Resize((h, w), antialias=True)(x)
+    y_ds = transforms.Resize((h, w), antialias=True)(y)
+    return torch.mean(torch.abs(x_ds - y_ds))
+
+
+def match_patch_distributions(input_img, target_img, criteria, output_dir, conf):
     """
     :param images: tensor of shape (H, W, C)
     """
+    device = torch.device(conf.device)
     os.makedirs(output_dir, exist_ok=True)
 
     optimized_variable = input_img.clone().unsqueeze(0).to(device)
     optimized_variable.requires_grad_(True)
-    optim = torch.optim.Adam([optimized_variable], lr=lr)
+    optim = torch.optim.Adam([optimized_variable], lr=conf.lr)
 
     target_img_pt = target_img.unsqueeze(0).to(device)
     vutils.save_image(torch.clip(optimized_variable, -1, 1), f"{output_dir}/output-0.png", normalize=True)
 
     all_losses = []
     all_means = []
-    for i in tqdm(range(1, num_steps + 1)):
+    for i in tqdm(range(1, conf.num_steps + 1)):
         optim.zero_grad()
 
         loss = criteria(optimized_variable, target_img_pt)
         all_losses.append(loss.item())
+
+        if conf.blur_loss > 0:
+            loss += conf.blur_loss * blur_loss(optimized_variable, target_img_pt)
+        if conf.tv_loss > 0:
+            loss += conf.tv_loss * tv_loss(optimized_variable)
 
         loss.backward()
         optim.step()
@@ -63,71 +78,46 @@ def match_patch_distributions(input_img, target_img, criteria, num_steps, lr, ou
     return torch.clip(optimized_variable.detach()[0], -1, 1)
 
 
-def retarget_image(img_path, criteria, output_dir, n_scales, pyr_factor,
-                   aspect_ratio=(1,1), resize=256, num_steps=2000, lr=0.001, init='noise'):
-    img = cv2.imread(img_path)
-    img = aspect_ratio_resize(img, max_dim=resize)
-    img = cv2pt(img)
+def get_initial_image(conf, h, w, raeget_img):
+    if conf.init == 'noise':
+        synthesis = torch.randn((3, h, w)) * 0.1
+    elif os.path.exists(conf.init):
+        from Experiments.create_mean_optimization_sets import center_crop_image_to_square
+        synthesis = cv2pt(aspect_ratio_resize(cv2.imread(conf.init), max_dim=conf.resize))
+        synthesis = transforms.Resize((h, w), antialias=True)(synthesis)
+    else: # blur
+        synthesis = transforms.Resize((h, w), antialias=True)(raeget_img)
+        synthesis = conv_gauss(synthesis.unsqueeze(0), get_kernel_gauss(size=11, sigma=7, n_channels=3))[0]
+        synthesis += torch.randn((3, h, w)) * 0.001
+    return synthesis
 
-    pyramid = get_pyramid(img, n_scales, pyr_factor)
 
-    for lvl, lvl_img in enumerate(pyramid):
+def retarget_image(target_img_path, criteria, conf, output_dir):
+    while os.path.exists(output_dir):
+        output_dir += '#'
+    os.makedirs(output_dir, exist_ok=True)
+    target_img = cv2.imread(target_img_path)
+    target_img = aspect_ratio_resize(target_img, max_dim=conf.resize)
+    target_img = cv2pt(target_img)
+
+    target_pyramid = get_pyramid(target_img, conf.n_scales, conf.pyr_factor)
+
+    for lvl, lvl_target_img in enumerate(target_pyramid):
         print(f"Starting lvl {lvl}")
-        h, w = int(lvl_img.shape[1] * aspect_ratio[0]), int(lvl_img.shape[2] * aspect_ratio[1])
+        h, w = int(lvl_target_img.shape[1] * conf.aspect_ratio[0]), int(lvl_target_img.shape[2] * conf.aspect_ratio[1])
         if lvl == 0:
-            if init == 'noise':
-                synthesis = torch.randn((3, h, w)) * 0.1
-            else:
-                synthesis = transforms.Resize((h, w), antialias=True)(img)
-                synthesis = conv_gauss(synthesis.unsqueeze(0), get_kernel_gauss(size=7, sigma=3, n_channels=3))[0]
-                synthesis += torch.randn((3, h, w)) * 0.001
-        if lvl > 0:
-                # synthesis = transforms.Resize((int(lvl_img.shape[1] * 1), int(lvl_img.shape[2] * 0.6)), antialias=True)(synthesis)
-                synthesis = transforms.Resize((h, w), antialias=True)(synthesis)
+            synthesis = get_initial_image(conf, h, w, target_img)
+        else:
+            synthesis = transforms.Resize((h, w), antialias=True)(synthesis)
 
         lvl_output_dir = os.path.join(output_dir, str(lvl))
-        vutils.save_image(lvl_img, os.path.join(output_dir, f"target-{lvl}.png"), normalize=True)
+        vutils.save_image(lvl_target_img, os.path.join(output_dir, f"target-{lvl}.png"), normalize=True)
         vutils.save_image(synthesis, os.path.join(output_dir, f"org-{lvl}.png"), normalize=True)
 
-        synthesis = match_patch_distributions(synthesis, lvl_img, criteria, 2 * num_steps if lvl == 0 else num_steps, lr,
-                                              lvl_output_dir)
+        synthesis = match_patch_distributions(synthesis, lvl_target_img, criteria, lvl_output_dir, conf)
 
         vutils.save_image(synthesis, os.path.join(output_dir, f"final-{lvl}.png"), normalize=True)
 
+    vutils.save_image(synthesis, output_dir + ".png", normalize=True)
 
-if __name__ == '__main__':
-    for tag in ['#1', '#2', '#3']:
-        # img_path = 'images/balloons.png'
-        # img_path = 'images/fruit.png'
-        # img_path = 'images/birds.png'
-        # img_path = 'images/colusseum.png'
-        img_path = 'images/SupremeCourt.jpeg'
-        # img_path = 'images/kanyon.jpg'
-        # img_path = 'images/soccer1.png'
-        # img_path = 'images/soccer2.jpg'
-        # img_path = 'images/soccer3.jpg'
-        # img_path = 'images/jerusalem1.jpg'
-        # img_path = 'images/jerusalem2.jpg'
-        # img_path = 'images/balls.jpg'
-        # img_path = 'images/mountins2.jpg'
-        # img_path = 'images/people_on_the_beach.jpg'
-        # img_path = 'images/girafs.png'
-        # img_path = 'images/cows.png'
-        # img_path = 'images/trees3.jpg'
-        # img_path = 'images/fruit.png'
-
-        criteria = losses.MMDApproximate(patch_size=7, strides=1, pool_size=-1, r=1024)
-
-        outputs_dir = 'outputs/test'
-        resize = 256
-        init = 'mean'
-        pyr_factor = 0.65; n_scales = 5; aspect_ratio = (1, 1.5); lr = 0.005; num_steps = 1500
-        # pyr_factor = 0.75; n_scales = 5; aspect_ratio = (1, 1); lr = 0.005; num_steps = 1500
-
-        img_name = os.path.basename(os.path.splitext(img_path)[0])
-
-        output_dir = f'{outputs_dir}/{img_name}/{criteria.name}_AR-{aspect_ratio}_R-{resize}_S-{pyr_factor}x{n_scales}_I-{init}_{tag}'
-        os.makedirs(output_dir, exist_ok=True)
-
-        retarget_image(img_path, criteria, output_dir, n_scales=n_scales, pyr_factor=pyr_factor,
-                       aspect_ratio=aspect_ratio, resize=resize, num_steps=num_steps, lr=lr, init=init)
+    return synthesis

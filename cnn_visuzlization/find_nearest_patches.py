@@ -12,7 +12,7 @@ def get_random_patch_with_activation(net, dataloader, device, sample_from_face_o
         device).float().unsqueeze(0)
     # image = next(iter(dataloader))[1][:1].to(device).float()
     all_patches = F.unfold(image, kernel_size=net.m_receptive_field, padding=0,
-                           stride=net.m_stride)  # (1, n_patches, flt_patch_size)
+                           stride=net.m_stride)  # (1, patch_size, n_patches)
 
     feature_maps = net(image).reshape(net.m_n_maps, -1)
 

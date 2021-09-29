@@ -1,6 +1,6 @@
+import numpy as np
 import torch
-
-from losses.composite_losses.compare_patch_distribution import PatchdistributionsLoss
+from losses.composite_losses.compare_patch_distribution import extract_patches
 
 
 def compute_swd(x, y, num_proj=256):
@@ -21,35 +21,40 @@ def compute_swd(x, y, num_proj=256):
 
 
 class PatchSWDLoss(torch.nn.Module):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, num_proj=256, sample_same_locations=True,
-                 batch_reduction='mean', normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, num_proj=256, batch_reduction='mean', normalize_patch='none'):
         super(PatchSWDLoss, self).__init__()
-        patch_metric = lambda x,y: compute_swd(x,y, num_proj)
-        self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations, batch_reduction, normalize_patch)
         self.name = f"PatchSWD(p-{patch_size}:{stride})"
+        self.patch_size = patch_size
+        self.stride = stride
+        self.num_proj = num_proj
+        self.batch_reduction = batch_reduction
+        self.normalize_patch = normalize_patch
 
     def forward(self, x, y):
-        return self.loss(x, y)
+        b, c, h, w = x.shape
+        x_patches = extract_patches(x, self.patch_size, self.stride, self.normalize_patch)
+        y_patches = extract_patches(y, self.patch_size, self.stride, self.normalize_patch)
 
-class FastPatchSWDLoss(torch.nn.Module):
-    def _get_w_b(self, n_channels):
-        self.w = torch.randn(self.r, n_channels, self.ksize, self.ksize) / self.sigma
-        if self.normalize_patch == 'channel_mean':
-            self.w -= self.w.mean(dim=(2, 3), keepdim=True)
-        elif self.normalize_patch == 'mean':
-            self.w -= self.w.mean(dim=(1, 2, 3), keepdim=True)
-        self.b = torch.rand(self.r) * (2 * np.pi)
-        return self.w, self.b
+        if y_patches.shape[1] > x_patches.shape[1]:
+            indices = torch.randperm(y_patches.shape[1])[:x_patches.shape[1]]
+            y_patches = y_patches[:, indices]
+            x_patches = x_patches[:, torch.randperm(x_patches.shape[1])]
 
-    def __init__(self, patch_size=7, stride=1, n_samples=None, num_proj=256, sample_same_locations=True,
-                 batch_reduction='mean', normalize_patch='none'):
-        super(FastPatchSWDLoss, self).__init__()
-        self.kernel = torch.randn(self.r, n_channels, self.ksize, self.ksize) / self.sigma
+        elif x_patches.shape[1] > y_patches.shape[1]:
+            indices = torch.randperm(x_patches.shape[1])[:y_patches.shape[1]]
+            x_patches = x_patches[:, indices]
+            y_patches = y_patches[:, torch.randperm(y_patches.shape[1])]
 
-        self.name = f"PatchSWD(p-{patch_size}:{stride})"
+        results = []
+        for i in range(b):
+            results.append(compute_swd(x_patches[i], y_patches[i], num_proj=self.num_proj))
 
-    def forward(self, x, y):
-        return self.loss(x, y)
+        results = torch.stack(results)
+
+        if self.batch_reduction == 'mean':
+            return results.mean()
+        else:
+            return results
 
 
 
