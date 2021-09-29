@@ -21,7 +21,7 @@ def compute_swd(x, y, num_proj=256):
 
 
 class PatchSWDLoss(torch.nn.Module):
-    def __init__(self, patch_size=7, stride=1, num_proj=256, batch_reduction='mean', normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, num_proj=256, normalize_patch='none', batch_reduction='mean'):
         super(PatchSWDLoss, self).__init__()
         self.name = f"PatchSWD(p-{patch_size}:{stride})"
         self.patch_size = patch_size

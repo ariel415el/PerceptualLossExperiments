@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 import losses
-from losses.composite_losses.compare_patch_distribution import PatchdistributionsLoss
+from losses.composite_losses.compare_patch_distribution import PatchdistributionsLoss, extract_patches
 
 
 def get_distance_matrix(X):
@@ -104,60 +104,56 @@ def compute_MMD(x_patches, y_patches, kernel):
 
 
 class PatchMMD(torch.nn.Module):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, batch_reduction='mean',
-                 normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, normalize_patch='none', batch_reduction='mean'):
         super(PatchMMD, self).__init__()
-
-        patch_metric = lambda x, y: compute_MMD(x, y, self.kernel)
-        self.loss = PatchdistributionsLoss(patch_metric, patch_size, stride, n_samples, sample_same_locations,
-                                           batch_reduction, normalize_patch)
+        self.patch_size = patch_size
+        self.stride = stride
+        self.batch_reduction = batch_reduction
+        self.normalize_patch = normalize_patch
         self.name = f"PatchMMD{self.kernel.name if self.kernel else ''}(p-{patch_size}:{stride})"
 
     def forward(self, x, y):
-        if not self.kernel:
-            raise NotImplementedError
+        b, c, h, w = x.shape
+        x_patches = extract_patches(x, self.patch_size, self.stride, self.normalize_patch)
+        y_patches = extract_patches(y, self.patch_size, self.stride, self.normalize_patch)
+
+        results = []
+        for i in range(b):
+            results.append(compute_MMD(x_patches[i], y_patches[i], self.kernel))
+
+        results = torch.stack(results)
+
+        if self.batch_reduction == 'mean':
+            return results.mean()
         else:
-            return self.loss(x, y)
+            return results
 
 
 class PatchMMD_RBF(PatchMMD):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, batch_reduction='mean',
-                 normalize_patch='none', sigmas=None):
+    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none', sigmas=None):
         if sigmas == None:
             sigmas = [0.1, 0.05, 0.025, 0.01]
         sigmas = np.array(sigmas) * patch_size ** 2
         self.kernel = MultiBandWitdhRbfKernel(sigmas)
 
-        super(PatchMMD_RBF, self).__init__(patch_size=patch_size, stride=stride, n_samples=n_samples,
-                                              sample_same_locations=sample_same_locations,
-                                              batch_reduction=batch_reduction,
-                                              normalize_patch=normalize_patch)
+        super(PatchMMD_RBF, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
 
 
 class PatchMMD_DotProd(PatchMMD):
-    def __init__(self, patch_size=7, stride=1, n_samples=None, sample_same_locations=True, batch_reduction='mean',
-                 normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none'):
         self.kernel = DotProductKernel()
 
-        super(PatchMMD_DotProd, self).__init__(patch_size=patch_size, stride=stride, n_samples=n_samples,
-                                              sample_same_locations=sample_same_locations,
-                                              batch_reduction=batch_reduction,
-                                              normalize_patch=normalize_patch)
+        super(PatchMMD_DotProd, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
 
 
 class PatchMMD_SSIM(PatchMMD):
-    def __init__(self, patch_size=11, stride=1, n_samples=None, sample_same_locations=True, batch_reduction='mean',
-                 normalize_patch='none'):
+    def __init__(self, patch_size=11, stride=1, batch_reduction='mean', normalize_patch='none'):
         self.kernel = SSIMKernel(win_size=patch_size)
 
-        super(PatchMMD_SSIM, self).__init__(patch_size=patch_size, stride=stride, n_samples=n_samples,
-                                              sample_same_locations=sample_same_locations,
-                                              batch_reduction=batch_reduction,
-                                              normalize_patch=normalize_patch)
+        super(PatchMMD_SSIM, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
 
 
 if __name__ == '__main__':
-    from tqdm import tqdm
     from time import time
     for loss in [
         PatchMMD_RBF(patch_size=11, stride=5),
