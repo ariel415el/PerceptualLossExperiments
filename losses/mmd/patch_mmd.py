@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 import losses
-from losses.composite_losses.compare_patch_distribution import PatchdistributionsLoss, extract_patches
+from losses.utils import extract_patches
 
 
 def get_distance_matrix(X):

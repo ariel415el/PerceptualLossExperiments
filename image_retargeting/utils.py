@@ -1,3 +1,7 @@
+import os
+from dataclasses import dataclass
+from typing import Tuple
+
 import cv2
 import numpy as np
 from torchvision import transforms
@@ -31,3 +35,29 @@ def get_pyramid(img, n_levels, pyr_factor):
 
 def quantize_image(img, N_colors):
     return np.round_(img*(N_colors/255))*(255/N_colors)
+
+
+def get_file_name(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+@dataclass
+class SyntesisConfigurations:
+    aspect_ratio: Tuple[float, float] = (1.,1.)
+    resize: int = 256
+    pyr_factor: float = 0.7
+    n_scales: int = 5
+    lr: float = 0.05
+    num_steps: int = 500
+    init: str = 'noise'
+    blur_loss: float = 0.0
+    tv_loss: float = 0.0
+    device: str = 'cuda:0'
+
+    def get_conf_tag(self):
+        init_name = 'img' if os.path.exists(self.init) else self.init
+        if self.blur_loss > 0:
+            init_name += f"_BL({self.blur_loss})"
+        if self.tv_loss > 0:
+            init_name += f"_TV({self.tv_loss})"
+        return f'AR-{self.aspect_ratio}_R-{self.resize}_S-{self.pyr_factor}x{self.n_scales}_I-{init_name}'

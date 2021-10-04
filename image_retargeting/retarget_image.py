@@ -21,17 +21,18 @@ def tv_loss(img):
 
 
 def blur_loss(x, y):
-    h,w = x.shape[-1] // 8, x.shape[-2] // 8
+    h,w = x.shape[-1] // 2, x.shape[-2] // 2
     x_ds = transforms.Resize((h, w), antialias=True)(x)
     y_ds = transforms.Resize((h, w), antialias=True)(y)
     return torch.mean(torch.abs(x_ds - y_ds))
 
 
-def match_patch_distributions(input_img, target_img, criteria, output_dir, conf):
+def match_patch_distributions(input_img, target_img, criteria, content_loss, conf, output_dir):
     """
     :param images: tensor of shape (H, W, C)
     """
     device = torch.device(conf.device)
+    criteria = criteria.to(device)
     os.makedirs(output_dir, exist_ok=True)
 
     optimized_variable = input_img.clone().unsqueeze(0).to(device)
@@ -54,13 +55,16 @@ def match_patch_distributions(input_img, target_img, criteria, output_dir, conf)
         if conf.tv_loss > 0:
             loss += conf.tv_loss * tv_loss(optimized_variable)
 
+        if content_loss:
+            loss += content_loss(optimized_variable)
+
         loss.backward()
         optim.step()
 
         if i % 1000 == 0:
             for g in optim.param_groups:
                 g['lr'] *= 0.9
-        if i % 500 == 0:
+        if i % 100 == 0:
             os.makedirs(output_dir, exist_ok=True)
             vutils.save_image(torch.clip(optimized_variable, -1, 1), f"{output_dir}/output-{i}.png", normalize=True)
         if i % 100 == 0:
@@ -92,14 +96,13 @@ def get_initial_image(conf, h, w, raeget_img):
     return synthesis
 
 
-def retarget_image(target_img_path, criteria, conf, output_dir):
+def retarget_image(target_img_path, criteria, content_loss, conf, output_dir):
     while os.path.exists(output_dir):
         output_dir += '#'
     os.makedirs(output_dir, exist_ok=True)
-    target_img = cv2.imread(target_img_path)
-    target_img = aspect_ratio_resize(target_img, max_dim=conf.resize)
-    target_img = cv2pt(target_img)
 
+    target_img = cv2.imread(target_img_path)
+    target_img = cv2pt(aspect_ratio_resize(target_img, max_dim=conf.resize))
     target_pyramid = get_pyramid(target_img, conf.n_scales, conf.pyr_factor)
 
     for lvl, lvl_target_img in enumerate(target_pyramid):
@@ -110,11 +113,10 @@ def retarget_image(target_img_path, criteria, conf, output_dir):
         else:
             synthesis = transforms.Resize((h, w), antialias=True)(synthesis)
 
-        lvl_output_dir = os.path.join(output_dir, str(lvl))
         vutils.save_image(lvl_target_img, os.path.join(output_dir, f"target-{lvl}.png"), normalize=True)
         vutils.save_image(synthesis, os.path.join(output_dir, f"org-{lvl}.png"), normalize=True)
 
-        synthesis = match_patch_distributions(synthesis, lvl_target_img, criteria, lvl_output_dir, conf)
+        synthesis = match_patch_distributions(synthesis, lvl_target_img, criteria, content_loss, conf, output_dir=os.path.join(output_dir, str(lvl)))
 
         vutils.save_image(synthesis, os.path.join(output_dir, f"final-{lvl}.png"), normalize=True)
 

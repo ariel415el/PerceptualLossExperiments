@@ -86,11 +86,11 @@ def load_and_run(content_img_path, style_img_path, style_loss, content_loss):
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = torch.device("cpu")
-    outputs_dir = 'outputs_inpaintings'
+    outputs_dir = 'outputs/outputs'
     max_iter = 600
     lr = 0.05
     batch_size = 1
-    imsize = 256
+    imsize = 512
     style_weight = 30
     tag = 'mean'
 
@@ -100,24 +100,27 @@ if __name__ == '__main__':
         # 'imgs/content/home_alone.jpg',
         # 'imgs/content/cornell.jpg',
         # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/images/balls_green.jpg'
-        '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00001_bw.png'
+        # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00001_bw.png'
+        '/home/ariel/university/imageTranslation/outputs/maps-89-to-95/result_a-with-patches-of-b.png'
+
     ]
 
     all_style_images = [
             # 'imgs/style/yellow_sunset.jpg',
             # 'imgs/style/starry_night.jpg',
+            '/home/ariel/university/imageTranslation/outputs/maps-89-to-95/reference_a.png'
             # # 'imgs/style/Vincent_van_Gogh_Olive_Trees.jpg',
             # 'imgs/style/scream.jpg',
-            # # 'imgs/style/abstraction.jpg',
+            # 'imgs/style/abstraction.jpg',
             # 'imgs/style/Muse.jpg',
             # 'imgs/style/mondrian.jpg',
             # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/image_retargeting/images/balls.jpg'
-            '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00020.png'
+            # '/home/ariel/university/PerceptualLoss/PerceptualLossExperiments/style_transfer/imgs/faces/00020.png'
     ]
 
     all_content_losses = [
-                # losses.NoLoss(),
-                losses.PyramidLoss(losses.GradLoss3Channels(), max_levels=3, weightening_mode=[1, 0, 0, 0]),
+                losses.NoLoss(),
+                # losses.PyramidLoss(losses.GradLoss3Channels(), max_levels=3, weightening_mode=[1, 0, 0, 0]),
                 # losses.VGGPerceptualLoss(pretrained=True, features_metric_name='l2', layers_and_weights=[('conv3_3', 1)])
                 # GradLoss()
                 # losses.L2()
@@ -126,7 +129,7 @@ if __name__ == '__main__':
     all_style_losses = [
             # losses.VGGPerceptualLoss(pretrained=True, features_metric_name='gram', layers_and_weights=[('relu1_2', 1), ('relu2_2', 1), ('relu3_3', 1), ('relu4_3', 1), ('relu5_3', 1)]),
             # losses.PatchMMD_RBF(patch_size=7, stride=3),
-            losses.PatchSWDLoss(patch_size=11, stride=1, num_proj=1024, normalize_patch='mean'),
+            # losses.PatchSWDLoss(patch_size=3, stride=1, num_proj=1024, normalize_patch='mean'),
             # losses.PatchSWDLoss(patch_size=11, stride=3, num_proj=1024)
             # losses.PatchSWDLoss(patch_size=15, stride=3, num_proj=1024),
             # losses.PatchSWDLoss(patch_size=31, stride=3, num_proj=1024)

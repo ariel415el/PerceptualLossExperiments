@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from losses.composite_losses.compare_patch_distribution import extract_patches
+from losses.utils import extract_patches
 
 
 def compute_swd(x, y, num_proj=256):
