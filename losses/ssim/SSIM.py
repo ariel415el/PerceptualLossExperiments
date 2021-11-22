@@ -103,13 +103,14 @@ class SSIM(torch.nn.Module):
 
 if __name__ == '__main__':
     loss = SSIM()
-    x = torch.ones(1, 3, 11, 11)
-    y = torch.ones(1, 3, 11, 11)
+    x = torch.ones(1, 3, 32, 32)
+    y = torch.ones(1, 3, 32, 32)
 
-    import losses
-    # loss = losses.PatchRBFLoss(patch_size=11, normalize_patch='channel_mean')
-    from time import time
-    start = time()
-    for i in range(1000):
-        loss(x, y)
-    print(f"{(time()-start)/1000} s per inference")
+    loss(x,y)
+    # import losses
+    # # loss = losses.PatchRBFLoss(patch_size=11, normalize_patch='channel_mean')
+    # from time import time
+    # start = time()
+    # for i in range(1000):
+    #     loss(x, y)
+    # print(f"{(time()-start)/1000} s per inference")

@@ -1,20 +1,28 @@
 import numpy as np
 import torch
 
-import losses
 from losses.utils import extract_patches
 
 
 def get_distance_matrix(X):
     XX = torch.matmul(X, X.t())
-
     X_norms = torch.sum(X ** 2, 1, keepdim=True)
-
     # exp[a,b] = (X[a] @ X[a])^2 -2(X[a] @ X[b]) + (X[b] @ X[b])^2 = || X[a] - X[b] ||^2
     return X_norms - 2 * XX + X_norms.t()
 
 
-class MultiBandWitdhRbfKernel:
+class kernel:
+    def __call__(self, X, S, **kwargs):
+        """
+        Weithed Sum of kernel activation of All Xs with themselves
+        :param X: an Nxd matrix with N points
+        :param S: an Nxd matrix of weights for each kernel activation
+        :return: scalar
+        """
+        raise NotImplementedError
+
+
+class MultiBandWitdhRbfKernel(kernel):
     def __init__(self, sigmas=None):
         self.name = '-MultiBandWitdhRbfKernel'
         if sigmas is None:
@@ -33,7 +41,33 @@ class MultiBandWitdhRbfKernel:
         return loss
 
 
-class DotProductKernel:
+class RbfKernel(kernel):
+    def __init__(self, sigma):
+        self.name = '-RbfKernel'
+        if sigma is None:
+            self.sigma = [2, 5, 10, 20, 40, 80]
+        else:
+            self.sigma = sigma
+
+    def __call__(self, X, S, **kwargs):
+        rbf_gram_matrix = torch.exp(get_distance_matrix(X) / (-2 * self.sigma ** 2))
+        loss = torch.sum(S * rbf_gram_matrix)
+        # loss = torch.log(loss)
+        return loss
+
+class InverseKernel(kernel):
+    def __init__(self, c):
+        self.name = '-InverseKernel'
+        self.c = c
+
+    def __call__(self, X, S, **kwargs):
+        # loss = 1 / get_distance_matrix(X)
+        loss = self.c / torch.sqrt(self.c**2 + get_distance_matrix(X))
+        loss = torch.sum(S * loss)
+        return loss
+
+
+class DotProductKernel(kernel):
     def __init__(self):
         self.name = '-DotProductKernel'
 
@@ -41,39 +75,6 @@ class DotProductKernel:
         XX = torch.matmul(X, X.t())
         loss = torch.sum(S * XX)
         return loss
-
-
-class SSIMKernel:
-    def __init__(self, win_size=11, win_sigma=1.5, K=(0.01, 0.03),):
-        from losses.ssim.SSIM import _fspecial_gauss_1d
-        self.win_size = win_size
-        self.K = K
-        self.win = _fspecial_gauss_1d(win_size, win_sigma).reshape(-1)
-        self.name = '-SSIMKernel'
-
-    def __call__(self, X, S, **kwargs):
-
-        self.win = self.win.to(X.device)
-        C1 = self.K[0] ** 2
-        C2 = self.K[1] ** 2
-
-        X = (X + 1) / 2
-        X = X.reshape(X.shape[0], 3, -1)
-        mus = (X * self.win).sum(-1)
-        mus_sq = mus.pow(2)
-        simgas = (X*X * self.win).sum(-1) - mus_sq
-
-        simgas_sum = simgas[:,None] + simgas[None,:]
-        mus_sum = mus_sq[:,None] + mus_sq[None,:]
-        mus_mult = mus_sq[:,None] * mus_sq[None,:]
-        sigmas_xy = (X[:,None] * X[None,:] * self.win).sum(-1) - mus_mult
-
-        cs_map = (2 * sigmas_xy + C2) / (simgas_sum + C2)  # set alpha=beta=gamma=1
-        ssim_map = ((2 * mus_mult + C1) / (mus_sum + C1))
-
-        ssim_map *= cs_map
-
-        return ssim_map.mean(-1) * S
 
 
 def get_scale_matrix(M, N):
@@ -98,8 +99,10 @@ def compute_MMD(x_patches, y_patches, kernel):
     N = y_patches.size()[0]
     S = get_scale_matrix(M, N).to(x_patches.device)
     all_patches = torch.cat((x_patches, y_patches), 0)
-    # S[:N,:N] *= 0.9
-    # S[N:,N:] = 0
+    # S[:N,:N] *= 0
+    # S[N:,N:] *= 0
+    # S[:N,N:] *= 1.25
+    # S[N:,:N] *= 1.25
     return kernel(all_patches, S)
 
 
@@ -129,37 +132,50 @@ class PatchMMD(torch.nn.Module):
             return results
 
 
-class PatchMMD_RBF(PatchMMD):
+class PatchMMDMultiRBF(PatchMMD):
     def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none', sigmas=None):
         if sigmas == None:
             sigmas = [0.1, 0.05, 0.025, 0.01]
         sigmas = np.array(sigmas) * patch_size ** 2
         self.kernel = MultiBandWitdhRbfKernel(sigmas)
 
+        super(PatchMMDMultiRBF, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
+
+
+class PatchMMD_RBF(PatchMMD):
+    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none', sigma=None):
+        if sigma == None:
+            sigma = 0.05
+        sigma *= patch_size ** 2
+        self.kernel = RbfKernel(sigma)
+
         super(PatchMMD_RBF, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
 
 
 class PatchMMD_DotProd(PatchMMD):
-    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none'):
+    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='mean'):
         self.kernel = DotProductKernel()
 
         super(PatchMMD_DotProd, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
 
 
-class PatchMMD_SSIM(PatchMMD):
-    def __init__(self, patch_size=11, stride=1, batch_reduction='mean', normalize_patch='none'):
-        self.kernel = SSIMKernel(win_size=patch_size)
+class PatchMMD_Inverse(PatchMMD):
+    def __init__(self, patch_size=7, stride=1, batch_reduction='mean', normalize_patch='none', c=None):
+        if c == None:
+            c = 1
+        self.kernel = InverseKernel(c)
 
-        super(PatchMMD_SSIM, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
+        super(PatchMMD_Inverse, self).__init__(patch_size=patch_size, stride=stride, normalize_patch=normalize_patch, batch_reduction=batch_reduction)
+
 
 
 if __name__ == '__main__':
     from time import time
+    import distribution_metrics
     for loss in [
         PatchMMD_RBF(patch_size=11, stride=5),
-        PatchMMD_SSIM(patch_size=11, stride=5),
-        losses.MMDApproximate(patch_size=11, strides=5, r=128),
-        losses.PatchSWDLoss(patch_size=11, stride=5),
+        distribution_metrics.MMDApproximate(patch_size=11, strides=5, r=128),
+        distribution_metrics.PatchSWDLoss(patch_size=11, stride=5),
     ]:
 
         x = torch.randn((16, 3, 128, 128)).cuda()

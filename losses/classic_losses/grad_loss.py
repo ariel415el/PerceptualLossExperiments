@@ -58,7 +58,6 @@ class GradLoss3Channels(torch.nn.Module):
         return loss
 
 
-
 class FastGradLoss(torch.nn.Module):
     def __init__(self, batch_reduction='mean'):
         super(FastGradLoss, self).__init__()

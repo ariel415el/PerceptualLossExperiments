@@ -109,3 +109,36 @@ def show_saliency_maps(net, dataloader, resize_patch, output_dir, device, n_imag
             weighted_image_grads = transforms.Resize((no_padding_image_grads.shape[2], no_padding_image_grads.shape[3]), antialias=True)(activations[c_idx])
             save_scaled_images(no_padding_image_grads * weighted_image_grads.unsqueeze(0), resize_patch, f"{img_dir}/channels/c-{c_idx}_scaled_image_grads.png")
 
+if __name__ == '__main__':
+    import cv2
+    from perceptual_mean_optimization.utils import cv2pt
+
+    from torchvision import transforms
+    from torchvision.transforms import InterpolationMode
+    from torchvision import utils as vutils
+
+    img = cv2.imread('/home/ariel/university/GPDM/GPDM/images/resampling/balloons.png')
+
+    all_patches = F.unfold(cv2pt(img).unsqueeze(0), kernel_size=32, padding=0, stride=16)
+    all_patches = all_patches[0].transpose(1, 0).reshape(-1, 3, 32, 32)
+    all_patches = transforms.Resize(all_patches.shape[-1] * 5, interpolation=InterpolationMode.NEAREST)(all_patches)
+
+    indices = np.random.randint(0, all_patches.shape[0], size=10)
+
+    vutils.save_image(all_patches, 'target.png', normalize=True, nrow=img.shape[1] // 16 - 1, pad_value=64, padding=10)
+
+    for i in indices:
+        save_scaled_images(all_patches[i], 1, f"target{i}.png")
+
+    img = cv2.resize(
+        cv2.imread('/home/ariel/university/GPDM/GPDM/outputs/image_resampling/balloons/PatchSWD(p-11:1)_AR-(1.0, 1.0)_R-256_S-0.75x5_I-noise##/0/output-500.png')
+        , (img.shape[1], img.shape[0]))
+    # img = cv2.imread('/home/ariel/university/GPDM/GPDM/images/retargeting/fruit.png')
+    img = cv2pt(img).unsqueeze(0)
+    all_patches = F.unfold(img, kernel_size=32, padding=0, stride=16)
+    all_patches = all_patches[0].transpose(1, 0).reshape(-1, 3, 32, 32)
+    all_patches = transforms.Resize(all_patches.shape[-1] * 5, interpolation=InterpolationMode.NEAREST)(all_patches)
+    vutils.save_image(all_patches, 'img.png', normalize=True, nrow=img.shape[-1] // 16 - 1, pad_value=64, padding=10)
+
+    for i in indices:
+        save_scaled_images(all_patches[i], 1, f"img{i}.png")

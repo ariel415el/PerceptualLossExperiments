@@ -15,3 +15,4 @@ from losses.mmd.approximate_patch_mmd import MMDApproximate
 from losses.local_term_loss import PatchRBFLoss
 from losses.vgg_loss.vgg_loss import VGGPerceptualLoss
 from losses.alexnet_loss.alexnet_loss import AlexNetLoss
+from losses.patch_coherence_loss import PatchCoherentLoss

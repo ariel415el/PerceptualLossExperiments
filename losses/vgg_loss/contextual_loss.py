@@ -53,7 +53,7 @@ def contextual_loss_2(x, y, h=0.5):
 
 
 
-def contextual_loss(x,y, h=0.5, loss_type='cosine'):
+def contextual_loss(x,y, h=0.1, loss_type='cosine'):
 
     while x.shape[2] * x.shape[3] >= 128 ** 2:
         x = F.avg_pool2d(x, 2)
@@ -95,6 +95,14 @@ def compute_relative_distance(dist_raw):
 
 def compute_cosine_distance(x, y):
     # mean shifting by channel-wise mean of `y`.
+    # s = 60
+    # if x.shape[-1] > s:
+    #     #     x = x[:,:,::2,::2]
+    #     #     y = y[:,:,::2,::2]
+    #     idx = torch.randint(0, x.shape[-1]**2 - 1, size=(s**2,))
+    #     x = x.view(x.shape[0], x.shape[1], -1)[:, :, idx].view(x.shape[0], x.shape[1], s, s)
+    #     y = y.view(y.shape[0], y.shape[1], -1)[:, :, idx].view(y.shape[0], y.shape[1], s, s)
+
     y_mu = y.mean(dim=(0, 2, 3), keepdim=True)
     x_centered = x - y_mu
     y_centered = y - y_mu
